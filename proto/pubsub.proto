@@ -1,57 +1,32 @@
 syntax = "proto3";
 
-option go_package = "pubsub/proto";
-option java_multiple_files = true;
-option java_package = "io.pubsub";
-option java_outer_classname = "PubSubProto";
+option go_package = "proto;pubsub";
 
 package pubsub;
 
 // PubSub service defination
 service PubSub {
-    // Publish a message
-    rpc publish (PublishRequest) returns (PublishRespond) {}
+  // Publish a message
+  rpc publish(PublishRequest) returns (PublishResponse) {}
 
-    // Subscribe a topic
-    rpc subscribe (SubscribeRequest) returns (stream SubscribeRespond) {}
+  // Subscribe a topic
+  rpc subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
 }
 
 // The request message for publish
-message PublishRequest {
-    repeated TopicMessagesPair topic_message_pairs = 1;
-}
+message PublishRequest { string topic = 1; }
 
 // The response message for publish
-message PublishRespond {
-    enum PublishStatus {
-        SUCCESS = 0;
-        FAIL = 1;
-    }
-    PublishStatus status = 1;
+message PublishResponse {
+  enum PublishStatus {
+    SUCCESS = 0;
+    FAIL = 1;
+  }
+  PublishStatus status = 1;
 }
 
 // The request message for subscribe
-message SubscribeRequest {
-    repeated Topic topics = 1;
-}
+message SubscribeRequest { string topic = 1; }
 
 // The response message for subscribe
-message SubscribeRespond {
-    repeated TopicMessagesPair topic_message_pairs = 1;
-}
-
-// Topic to messages pair
-message TopicMessagesPair {
-    Topic topic = 1;
-    repeated Message messages = 2;
-}
-
-// Defination for a single message
-message Message {
-    string content = 1;
-}
-
-// Defination for a topic
-message Topic {
-    string topic = 1;
-}
+message SubscribeResponse { repeated string content = 2; }
