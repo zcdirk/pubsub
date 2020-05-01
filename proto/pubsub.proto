@@ -19,14 +19,18 @@ message PublishRequest { string topic = 1; }
 // The response message for publish
 message PublishResponse {
   enum PublishStatus {
-    SUCCESS = 0;
-    FAIL = 1;
+    OK = 0;
+    CHANNEL_EXISTS = 1;
+    UNKNOWN_FAILURE = 2;
   }
   PublishStatus status = 1;
 }
 
 // The request message for subscribe
-message SubscribeRequest { string topic = 1; }
+message SubscribeRequest { repeated string topic = 1; }
 
 // The response message for subscribe
-message SubscribeResponse { repeated string content = 2; }
+message SubscribeResponse {
+  string id = 1;
+  string content = 2;
+}
