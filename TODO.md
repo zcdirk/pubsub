@@ -1,4 +1,4 @@
-##Major Milestones
+## Major Milestones
 - [ ] Implement a primitive Pub/Sub server application that covers the following three components on a single machine.
 - [ ] Publisher: The applications send/publish messages
 - [ ] Topic: Every message sent out by the publisher will have a specific topic.
@@ -9,7 +9,7 @@ replicated onto multiple machines.
 - [ ] Enforce consensus algorithm in the distributed Pub/Sub service system to preserve the order of the incoming 
 publishing messages.
 
-##Optional Functionalities
+## Optional Functionalities
 - [ ] Message history.
 - [ ] Add security checking.
 - [ ] Improve service performance.
