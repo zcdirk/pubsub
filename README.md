@@ -15,7 +15,3 @@ so it could fit the requirement of the services that depend on it.
 Therefore, we propose this project that aims to replicate the functions of
 a pub/sub service with the capabilities to horizontally scale onto multiple
 machines to better serve the distributed systems it supports. 
-
-### Developer Setup
-The project uses a self-configured automation to make sure the generated
-proto is always the most updated.

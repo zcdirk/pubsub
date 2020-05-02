@@ -13,24 +13,32 @@ service PubSub {
   rpc subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
 }
 
+// Topic
+message Topic { string topic = 1; }
+
+// Message
+message Message {
+  string id = 1;
+  string content = 2;
+}
+
 // The request message for publish
-message PublishRequest { string topic = 1; }
+message PublishRequest {
+  Topic topic = 1;
+  Message msg = 2;
+}
 
 // The response message for publish
 message PublishResponse {
   enum PublishStatus {
     OK = 0;
-    CHANNEL_EXISTS = 1;
-    UNKNOWN_FAILURE = 2;
+    FAILURE = 1;
   }
   PublishStatus status = 1;
 }
 
 // The request message for subscribe
-message SubscribeRequest { repeated string topic = 1; }
+message SubscribeRequest { repeated Topic topic = 1; }
 
 // The response message for subscribe
-message SubscribeResponse {
-  string id = 1;
-  string content = 2;
-}
+message SubscribeResponse { Message msg = 1; }
