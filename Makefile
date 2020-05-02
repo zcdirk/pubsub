@@ -1,5 +1,8 @@
 all: 
 
+init:
+	git config core.hooksPath .githooks
+
 protobuf: proto
 	protoc proto/*.proto --go_out=plugins=grpc:.
 
