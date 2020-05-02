@@ -17,8 +17,8 @@ jobs:
       uses: actions/checkout@v2
     - name: install-dependencies
       run: |
-        go get -u ./...
         go get -u github.com/golang/protobuf/protoc-gen-go
         go get -u google.golang.org/grpc
+        go get -u ./...
     - name: test
       run: make test
