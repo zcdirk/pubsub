@@ -3,6 +3,11 @@ all:
 init:
 	git config core.hooksPath .githooks
 
+dependencies:
+	go get -u github.com/golang/protobuf/protoc-gen-go
+	go get -u google.golang.org/grpc
+	go get -u github.com/cs244b-2020-spring-pubsub/pubsub/...
+
 protobuf: proto
 	protoc proto/*.proto --go_out=plugins=grpc:.
 
@@ -14,6 +19,9 @@ client: protobuf client/main.go
 
 test: protobuf
 	go test -v github.com/cs244b-2020-spring-pubsub/pubsub/...
+
+image:
+	docker build -t pubsub .
 
 clean:
 	rm -f proto/*.pb.go
