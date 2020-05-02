@@ -7,7 +7,7 @@ Code review is required and highly recommended.
 
 ### Setup
 The project relies on automation tools to keep the generated code assets
-in sync with thier source defintion. Once you have cloned the repo, please
+in sync with their source definition. Once you have cloned the repo, please
 run `make init` to set up automation for workflows.
 
 ### CI
