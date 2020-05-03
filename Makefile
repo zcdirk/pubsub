@@ -14,14 +14,14 @@ test: pb
 	go test -v ./...
 
 server: pb
-	go build -v -o pubsub-server .
+	go build -v -o bin/pubsub .
 
 client: pb
-	go build -v -o pubsub-client ./pubsubctl
+	go build -v -o bin/pubsubctl ./pubsubctl
 
 docker:
 	docker build -t pubsub .
 
 clean:
 	rm -f proto/*.pb.go
-	rm -f pubsub-*
+	rm -rf bin
