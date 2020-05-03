@@ -14,7 +14,7 @@ service PubSub {
 }
 
 // Topic
-message Topic { string topic = 1; }
+message Topic { string name = 1; }
 
 // Message
 message Message {

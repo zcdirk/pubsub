@@ -13,15 +13,16 @@ pb: proto/*.proto
 test: pb
 	go test -v ./...
 
-server: pb main.go
+server: pb
 	go build -v -o pubsub-server .
 
-client: pb client/main.go
-	go build -v -o pubsub-client ./client
+client: pb
+	go build -v -o pubsubctl ./client
 
 docker:
 	docker build -t pubsub .
 
 clean:
 	rm -f proto/*.pb.go
-	rm -f pubsub-*
+	rm -f pubsub-server
+	rm -f pubsubctl
