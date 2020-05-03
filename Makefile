@@ -17,7 +17,7 @@ server: pb
 	go build -v -o pubsub-server .
 
 client: pb
-	go build -v -o pubsubctl ./ctl
+	go build -v -o pubsub-client ./pubsubctl
 
 docker:
 	docker build -t pubsub .
@@ -25,4 +25,3 @@ docker:
 clean:
 	rm -f proto/*.pb.go
 	rm -f pubsub-*
-	rm -f pubsubctl
