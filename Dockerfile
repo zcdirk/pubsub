@@ -8,7 +8,7 @@ RUN cd /app && \
 
 FROM alpine:latest
 WORKDIR /app
-COPY --from=build /app/pubsub-server /app
+COPY --from=build /app/bin/pubsub /app
 
 EXPOSE 7476
-ENTRYPOINT ./pubsub-server
+ENTRYPOINT ./pubsub
