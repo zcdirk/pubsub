@@ -1,7 +1,6 @@
 #!/bin/sh
 
-make pb
-go mod tidy
+make clean
 
 git add proto/
 git add go.mod

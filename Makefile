@@ -22,6 +22,6 @@ client: pb
 docker:
 	docker build -t pubsub .
 
-clean:
-	rm -f proto/*.pb.go
+clean: pb
 	rm -rf bin
+	go mod tidy
