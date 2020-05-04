@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+option go_package = "proto;pubsub";
+
+package pubsub;
+
+// PubSub server config
+message ServerConfig { int32 port = 1; }
