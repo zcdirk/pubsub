@@ -29,3 +29,10 @@ pubsub --help
 # Initiate the server
 pubsub --config=<path_to_config>
 ```
+
+### Config
+Pub/Sub ingests protobuf based configuration; config structure is defined
+at [proto/config.proto](proto/config.proto).
+
+Users shall write their config as a `textproto` file. You can read more
+about `textproto` from [here](https://medium.com/@nathantnorth/protocol-buffers-text-format-14e0584f70a5).
