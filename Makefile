@@ -20,7 +20,7 @@ client: pb
 	go build -v -o bin/pubsubctl ./pubsubctl
 
 docker:
-	docker build -t docker.pkg.github.com/cs244b-2020-spring-pubsub/pubsub/server .
+	docker build -t pubsub .
 
 clean: pb
 	rm -rf bin
