@@ -15,3 +15,17 @@ so it could fit the requirement of the services that depend on it.
 Therefore, we propose this project that aims to replicate the functions of
 a pub/sub service with the capabilities to horizontally scale onto multiple
 machines to better serve the distributed systems it supports. 
+
+### Install
+```
+go get -u github.com/cs244b-2020-spring-pubsub/pubsub
+```
+
+### Usage
+```
+# Usage
+pubsub --help
+
+# Initiate the server
+pubsub --config=<path_to_config>
+```
