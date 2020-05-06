@@ -8,6 +8,9 @@ import (
 )
 
 func TestPersistAndPublishMessage(t *testing.T) {
+	topicToServersMap = make(map[string][]pb.PubSub_SubscribeServer)
+	messageHistoryQueue = nil
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

@@ -6,6 +6,9 @@ import (
 )
 
 func TestPersistTopics(t *testing.T) {
+	topicToServersMap = make(map[string][]pb.PubSub_SubscribeServer)
+	messageHistoryQueue = nil
+
 	var stream1, stream2, stream3 pb.PubSub_SubscribeServer
 	PersistTopics(stream1, []*pb.Topic{{Name: "Topic1"}})
 	PersistTopics(stream2, []*pb.Topic{{Name: "Topic1"}, {Name: "Topic2"}})
@@ -13,13 +16,13 @@ func TestPersistTopics(t *testing.T) {
 
 	if len(GetServersForTopic("Topic1")) != 2 ||
 		GetServersForTopic("Topic1")[0] != stream1 ||
-		GetServersForTopic("Topic1")[2] != stream2 {
-		t.Error("Topic1 persist error")
+		GetServersForTopic("Topic1")[1] != stream2 {
+		t.Errorf("Topic1 persist error %v", len(GetServersForTopic("Topic1")))
 	}
 
 	if len(GetServersForTopic("Topic2")) != 1 ||
-		GetServersForTopic("Topic2")[2] != stream2 {
-		t.Error("Topic2 persist error")
+		GetServersForTopic("Topic2")[0] != stream2 {
+		t.Errorf("Topic2 persist error %v", len(GetServersForTopic("Topic2")))
 	}
 
 	if len(GetServersForTopic("Topic3")) != 1 ||
