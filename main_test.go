@@ -39,6 +39,7 @@ func TestPersistTopics(t *testing.T) {
 	go ts.Subscribe(&pb.SubscribeRequest{Topic: []*pb.Topic{&topic2}}, stream2)
 	go ts.Subscribe(&pb.SubscribeRequest{Topic: []*pb.Topic{&topic3}}, stream2)
 
+	// We need to wait some time between 2 actions to avoid concurrency issue
 	time.Sleep(time.Second)
 
 	ts.Publish(ctx, &pb.PublishRequest{Topic: &topic1, Msg: &msg1})
