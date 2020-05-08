@@ -51,9 +51,8 @@ func (s *pubsubServer) Publish(ctx context.Context, request *pb.PublishRequest) 
 // Subscribe a topic
 func (s *pubsubServer) Subscribe(request *pb.SubscribeRequest, stream pb.PubSub_SubscribeServer) error {
 	log.Printf("Subscribe: %v\n", request)
+	c := make(chan *pb.Message)
 	for _, topic := range request.Topic {
-		c := make(chan *pb.Message)
-
 		mapLock.Lock()
 		channels, ok := topicToChannelsMap[topic.Name]
 		if ok {
@@ -62,14 +61,11 @@ func (s *pubsubServer) Subscribe(request *pb.SubscribeRequest, stream pb.PubSub_
 			topicToChannelsMap[topic.Name] = []chan *pb.Message{c}
 		}
 		mapLock.Unlock()
-
-		go sendMessage(c, stream)
 	}
-	for !s.quit {}
-	return nil
+	return listenAndRespond(c, stream)
 }
 
-func sendMessage(c chan *pb.Message, stream pb.PubSub_SubscribeServer) {
+func listenAndRespond(c chan *pb.Message, stream pb.PubSub_SubscribeServer) error {
 	for {
 		select {
 		case msg:= <-c:
@@ -77,6 +73,7 @@ func sendMessage(c chan *pb.Message, stream pb.PubSub_SubscribeServer) {
 			err := stream.Send(&pb.SubscribeResponse{Msg: msg})
 			if err != nil {
 				log.Printf("failed to publish: %v\n", err)
+				return err
 			}
 		}
 	}
