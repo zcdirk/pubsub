@@ -30,6 +30,7 @@ func TestPersistTopics(t *testing.T) {
 	stream2.EXPECT().Send(&pb.SubscribeResponse{Msg: &msg2}).Return(nil)
 	stream2.EXPECT().Send(&pb.SubscribeResponse{Msg: &msg3}).Return(nil)
 
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -38,13 +39,16 @@ func TestPersistTopics(t *testing.T) {
 	go ts.Subscribe(&pb.SubscribeRequest{Topic: []*pb.Topic{&topic2}}, stream2)
 	go ts.Subscribe(&pb.SubscribeRequest{Topic: []*pb.Topic{&topic3}}, stream2)
 
-	for len(topicToChannelsMap["Topic1"]) != 1 ||
-		len(topicToChannelsMap["Topic2"]) != 2 ||
-		len(topicToChannelsMap["Topic3"]) != 1 {}
+	time.Sleep(time.Second)
 
 	ts.Publish(ctx, &pb.PublishRequest{Topic: &topic1, Msg: &msg1})
+	time.Sleep(time.Second)
+
 	ts.Publish(ctx, &pb.PublishRequest{Topic: &topic2, Msg: &msg2})
+	time.Sleep(time.Second)
+
 	ts.Publish(ctx, &pb.PublishRequest{Topic: &topic3, Msg: &msg3})
+	time.Sleep(time.Second)
 
 	ts.quit = true
 }
