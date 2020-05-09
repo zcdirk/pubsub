@@ -67,14 +67,12 @@ func (s *pubsubServer) Subscribe(request *pb.SubscribeRequest, stream pb.PubSub_
 
 func listenAndRespond(c chan *pb.Message, stream pb.PubSub_SubscribeServer) error {
 	for {
-		select {
-		case msg:= <-c:
-			log.Println(msg.Content)
-			err := stream.Send(&pb.SubscribeResponse{Msg: msg})
-			if err != nil {
-				log.Printf("failed to publish: %v\n", err)
-				return err
-			}
+		msg:= <-c
+		log.Println(msg.Content)
+		err := stream.Send(&pb.SubscribeResponse{Msg: msg})
+		if err != nil {
+			log.Printf("failed to publish: %v\n", err)
+			return err
 		}
 	}
 }
