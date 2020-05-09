@@ -28,7 +28,6 @@ var (
 
 type pubsubServer struct {
 	pb.UnimplementedPubSubServer
-	quit bool
 }
 
 // Publish a message

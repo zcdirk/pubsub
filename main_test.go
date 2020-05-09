@@ -50,6 +50,4 @@ func TestPersistTopics(t *testing.T) {
 
 	ts.Publish(ctx, &pb.PublishRequest{Topic: &topic3, Msg: &msg3})
 	time.Sleep(time.Second)
-
-	ts.quit = true
 }
