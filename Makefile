@@ -1,11 +1,7 @@
 all: 
 
-init:
-	git config core.hooksPath .githooks
-
 dependencies:
 	go get -u github.com/golang/protobuf/protoc-gen-go
-	go get ./...
 
 pb: proto/*.proto
 	protoc proto/*.proto --go_out=plugins=grpc:.
@@ -23,5 +19,5 @@ docker:
 	docker build -t pubsub .
 
 clean: pb
-	rm -rf bin
 	go mod tidy
+	rm -rf bin
