@@ -1,3 +1,5 @@
+// go:generate make pb
+
 package main
 
 import (
@@ -21,9 +23,9 @@ const (
 )
 
 var (
-	path = flag.String("config", "", "path to pubsub server config")
+	path               = flag.String("config", "", "path to pubsub server config")
 	topicToChannelsMap = make(map[string][]chan *pb.Message)
-	mapLock = new(sync.Mutex)
+	mapLock            = new(sync.Mutex)
 )
 
 type pubsubServer struct {
@@ -66,7 +68,7 @@ func (s *pubsubServer) Subscribe(request *pb.SubscribeRequest, stream pb.PubSub_
 
 func listenAndRespond(c chan *pb.Message, stream pb.PubSub_SubscribeServer) error {
 	for {
-		msg:= <-c
+		msg := <-c
 		log.Println(msg.Content)
 		err := stream.Send(&pb.SubscribeResponse{Msg: msg})
 		if err != nil {
