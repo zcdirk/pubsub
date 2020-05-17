@@ -1,16 +1,16 @@
 syntax = "proto3";
 
-option go_package = "proto;pubsub";
+option go_package = "proto;proto";
 
 package pubsub;
 
 // PubSub service defination
 service PubSub {
   // Publish a message
-  rpc publish(PublishRequest) returns (PublishResponse) {}
+  rpc Publish(PublishRequest) returns (PublishResponse) {}
 
   // Subscribe a topic
-  rpc subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
 }
 
 // Topic

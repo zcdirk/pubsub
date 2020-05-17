@@ -4,13 +4,16 @@ init:
 	git config core.hooksPath .githooks
 
 dependencies:
+	go get -u github.com/golang/mock/mockgen
 	go get -u github.com/golang/protobuf/protoc-gen-go
-	go get ./...
 
-pb: proto/*.proto
+pb:
 	protoc proto/*.proto --go_out=plugins=grpc:.
 
-test: pb
+mock: pb
+	mockgen -destination mock/pubsub_mock.go github.com/cs244b-2020-spring-pubsub/pubsub/proto PubSub_SubscribeServer,PubSubServer,PubSubClient
+
+test: pb mock
 	go test -v ./...
 
 server: pb
@@ -22,6 +25,6 @@ client: pb
 docker:
 	docker build -t pubsub .
 
-clean: pb
+clean:
 	rm -rf bin
-	go mod tidy
+	rm -rf mock

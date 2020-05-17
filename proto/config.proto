@@ -1,8 +1,43 @@
 syntax = "proto3";
 
-option go_package = "proto;pubsub";
+option go_package = "proto;proto";
 
 package pubsub;
 
 // PubSub server config
-message ServerConfig { int32 port = 1; }
+message ServerConfig {
+  enum ReplicationMode {
+    SINGLE_MACHINE = 0;
+    MASTER_SLAVE = 1;
+  }
+
+  // PubSub service port
+  int32 port = 1;
+
+  // PubSub service replication mode
+  ReplicationMode replication_mode = 2;
+
+  message MasterSlaveConfig {
+    enum NodeMode {
+      MASTER = 0;
+      SLAVE = 1;
+    }
+
+    // In master-salve mode, a node can
+    // be either master or a slave.
+    NodeMode mode = 1;
+
+    // Address of its master node
+    // if current node is a slave.
+    string master_address = 2;
+
+    // Port on which master node hosts
+    // PubSub service.
+    int32 master_port = 3;
+  }
+
+  // Config fragment for PubSub if
+  // the service is replicated through
+  // master-slave mode.
+  MasterSlaveConfig master_slave_config = 3;
+}
