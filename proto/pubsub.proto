@@ -30,11 +30,17 @@ message PublishRequest {
 
 // The response message for publish
 message PublishResponse {
-  enum PublishStatus {
-    OK = 0;
-    FAILURE = 1;
+  // Response when publish is successful
+  message Success {}
+
+
+  // Response when publish fails
+  message Failure { string reason = 1; }
+
+  oneof status {
+    Success success = 1;
+    Failure failure = 2;
   }
-  PublishStatus status = 1;
 }
 
 // The request message for subscribe

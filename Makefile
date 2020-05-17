@@ -13,7 +13,7 @@ pb:
 mock: pb
 	mockgen -destination mock/pubsub_mock.go github.com/cs244b-2020-spring-pubsub/pubsub/proto PubSub_SubscribeServer,PubSubServer,PubSubClient
 
-test: pb mock
+test: mock
 	go test -v ./...
 
 server: pb

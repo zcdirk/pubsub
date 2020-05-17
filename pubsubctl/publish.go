@@ -45,8 +45,9 @@ func (c *publishCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...inte
 		log.Fatalf("error ocurred while publishing message: %v", err)
 	}
 
-	if res.Status != pb.PublishResponse_OK {
-		log.Fatalf("publish request failed: %v", res.Status)
+	switch res.Status.(type) {
+	case *pb.PublishResponse_Failure_:
+		log.Fatalf("publish request failed: %v", res.GetFailure().Reason)
 	}
 
 	return subcommands.ExitSuccess

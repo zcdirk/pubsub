@@ -34,6 +34,10 @@ message ServerConfig {
     // Port on which master node hosts
     // PubSub service.
     int32 master_port = 3;
+
+    // Timeout of connection from slave
+    // to master.
+    string master_timeout = 4;
   }
 
   // Config fragment for PubSub if

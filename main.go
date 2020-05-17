@@ -44,7 +44,10 @@ func main() {
 		MaxConnectionIdle: 5 * time.Minute,
 	}))
 
-	server.ConfigurePubsubServer(svr, cfg)
+	err = server.ConfigurePubsubServer(svr, cfg)
+	if err != nil {
+		log.Fatalf("failed to configure server: %v", err)
+	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
