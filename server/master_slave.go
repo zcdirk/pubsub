@@ -2,50 +2,39 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"strings"
 	"sync"
 
 	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
 	"github.com/golang/protobuf/proto"
 )
 
-var (
-	sysHeader = "sys"
-)
+type masterSlaveServer struct {
+	singleMachineServer
+}
 
-func isInReservedNamespace(t string) bool {
-	for _, h := range []string{sysHeader} {
-		if strings.HasPrefix(t, h+"+") {
-			return true
-		}
+func (s *masterSlaveServer) Subscribe(req *pb.SubscribeRequest, stream pb.PubSub_SubscribeServer) error {
+	for _, t := range req.Topic {
+		t.Name = "user-" + t.Name
 	}
-	return false
+	return s.singleMachineServer.Subscribe(req, stream)
 }
 
 type masterServer struct {
-	singleMachineServer
+	masterSlaveServer
 }
 
 // NewMasterServer creates master server in master-slave mode.
 func NewMasterServer() pb.PubSubServer {
 	return &masterServer{
-		singleMachineServer: singleMachineServer{&sync.Map{}},
+		masterSlaveServer: masterSlaveServer{
+			singleMachineServer: singleMachineServer{&sync.Map{}},
+		},
 	}
 }
 
 func (s *masterServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
-	if isInReservedNamespace(req.Topic.Name) {
-		return &pb.PublishResponse{
-			Status: &pb.PublishResponse_Failure_{
-				Failure: &pb.PublishResponse_Failure{
-					Reason: fmt.Sprintf("topic name is in namespace reserved for internal use only: %s", req.Topic.Name),
-				},
-			},
-		}, nil
-	}
-
+	req.Topic.Name = "user-" + req.Topic.Name
 	if chs, ok := s.m.Load("sys-slave"); ok {
 		for _, c := range chs.([]chan *pb.Message) {
 			c <- &pb.Message{Content: req.String()}
@@ -56,15 +45,17 @@ func (s *masterServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb
 }
 
 type slaveServer struct {
-	singleMachineServer
+	masterSlaveServer
 	mst pb.PubSubClient
 }
 
 // NewSlaveServer creates slave server in master-slave mode.
 func NewSlaveServer(mst pb.PubSubClient) pb.PubSubServer {
 	svr := &slaveServer{
-		singleMachineServer: singleMachineServer{&sync.Map{}},
-		mst:                 mst,
+		masterSlaveServer: masterSlaveServer{
+			singleMachineServer: singleMachineServer{&sync.Map{}},
+		},
+		mst: mst,
 	}
 
 	if err := svr.init(); err != nil {
@@ -110,6 +101,5 @@ func (s *slaveServer) init() error {
 
 func (s *slaveServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
 	log.Printf("publish reroute to master %s", req)
-
 	return s.mst.Publish(ctx, req)
 }
