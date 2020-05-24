@@ -6,7 +6,7 @@ jobs:
       matrix:
         number-of-client: [500x, 1000x, 3000x, 5000x, 10000x]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
     - name: checkout-code
       uses: actions/checkout@v2
@@ -15,5 +15,5 @@ jobs:
     - name: single-machine-benchmark
       run: |
         make single-machine-up
-        sleep 3
+        sleep 5
         go test -bench=BenchmarkSingleMachine -benchtime=${{ matrix.number-of-client }} -v ./simulation/...

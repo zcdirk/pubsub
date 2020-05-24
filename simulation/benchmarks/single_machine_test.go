@@ -2,8 +2,8 @@ package benchmarks
 
 import (
 	"context"
+	"fmt"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -11,24 +11,22 @@ import (
 )
 
 func BenchmarkSingleMachine(b *testing.B) {
-	wg := &sync.WaitGroup{}
-	wg.Add(b.N)
-	want := n * (n + 1) / 2
-
+	sub := pb.NewPubSubClient(createPubSubConn(b))
+	ec := make(chan error)
 	for i := 0; i < b.N; i++ {
 		go func() {
-			sub := pb.NewPubSubClient(createPubSubConn(b))
-
 			stream, err := sub.Subscribe(context.Background(), &pb.SubscribeRequest{Topic: []*pb.Topic{topic}})
 			if err != nil {
-				b.Fatalf("error connect to server: %s", err)
+				ec <- err
+				return
 			}
 
 			got := 0
 			for j := 0; j < n; j++ {
 				res, err := stream.Recv()
 				if err != nil {
-					b.Fatalf("error receiving message from server: %s", err)
+					ec <- err
+					return
 				}
 
 				x, _ := strconv.Atoi(res.Msg.Content)
@@ -36,10 +34,9 @@ func BenchmarkSingleMachine(b *testing.B) {
 			}
 
 			if got != want {
-				b.Fatalf("data was lost in process: wanted %d, but got %d", want, got)
+				ec <- fmt.Errorf("data was compromised in process, want: %d, but got: %d", want, got)
+				return
 			}
-
-			wg.Done()
 		}()
 	}
 
@@ -57,7 +54,11 @@ func BenchmarkSingleMachine(b *testing.B) {
 		}
 	}
 
-	wg.Wait()
+	for i := 0; i < b.N; i++ {
+		if err := <-ec; err != nil {
+			b.Fatalf("client error: %s", err)
+		}
+	}
 
 	b.StopTimer()
 }

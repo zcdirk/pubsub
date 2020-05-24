@@ -10,6 +10,7 @@ import (
 
 var (
 	n     = 100
+	want  = n * (n + 1) / 2
 	topic = &pb.Topic{Name: "sum"}
 )
 
