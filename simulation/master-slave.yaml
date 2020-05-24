@@ -1,0 +1,55 @@
+version: '3.2'
+services:
+  master:
+    build: 
+      context: ../
+    ports: 
+    - "7476:7476"
+    volumes:
+    - type: bind
+      source: ../config/master_slave
+      target: /config
+    environment:
+    - CONFIG=/config/master.textpb
+  
+  slave-0:
+    depends_on: 
+    - master
+    build: 
+      context: ../
+    ports: 
+    - "7477:7476"
+    volumes:
+    - type: bind
+      source: ../config/master_slave
+      target: /config
+    environment:
+    - CONFIG=/config/slave-0.textpb
+
+  slave-1:
+    depends_on:
+    - master
+    build: 
+      context: ../
+    ports: 
+    - "7478:7476"
+    volumes:
+    - type: bind
+      source: ../config/master_slave
+      target: /config
+    environment:
+    - CONFIG=/config/slave-1.textpb
+  
+  slave-2:
+    depends_on:
+    - slave-0
+    build: 
+      context: ../
+    ports: 
+    - "7479:7476"
+    volumes:
+    - type: bind
+      source: ../config/master_slave
+      target: /config
+    environment:
+    - CONFIG=/config/slave-2.textpb

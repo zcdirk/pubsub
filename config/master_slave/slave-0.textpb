@@ -1,8 +1,8 @@
-port: 3001
 replication_mode: MASTER_SLAVE
+port: 7476
 master_slave_config: {
   mode: SLAVE
-  master_address: "localhost"
-  master_port: 3000
+  master_address: "master"
+  master_port: 7476
   master_timeout: "10s"
 }

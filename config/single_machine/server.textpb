@@ -1,2 +1,2 @@
-port: 3000
 replication_mode: SINGLE_MACHINE
+port: 7476

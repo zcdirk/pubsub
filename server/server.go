@@ -2,43 +2,52 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
 	"google.golang.org/grpc"
 )
 
-// ConfigurePubsubServer configures PubSub server implementation based on use config
-func ConfigurePubsubServer(svr *grpc.Server, cfg *pb.ServerConfig) error {
+// CreatePubsubServer creates PubSub server implementation based on user config
+func CreatePubsubServer(cfg *pb.ServerConfig, opts ...grpc.ServerOption) (*grpc.Server, error) {
+	svr := grpc.NewServer(opts...)
+
 	switch cfg.ReplicationMode {
 	case pb.ServerConfig_SINGLE_MACHINE:
 		pb.RegisterPubSubServer(svr, NewSingleMachineServer())
-		return nil
+		return svr, nil
 
 	case pb.ServerConfig_MASTER_SLAVE:
 		switch msCfg := cfg.MasterSlaveConfig; msCfg.Mode {
 		case pb.ServerConfig_MasterSlaveConfig_MASTER:
-			pb.RegisterPubSubServer(svr, NewMasterServer())
+			mst := NewMasterServer()
+			pb.RegisterPubSubServer(svr, mst)
+			pb.RegisterMasterSidecarServer(svr, mst)
 
 		case pb.ServerConfig_MasterSlaveConfig_SLAVE:
 			connTimeout, err := time.ParseDuration(msCfg.MasterTimeout)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
+			mst := fmt.Sprintf("%s:%d", msCfg.MasterAddress, msCfg.MasterPort)
+			log.Printf("connect to master server: %s", mst)
 			conn, err := grpc.Dial(
-				fmt.Sprintf("%s:%d", msCfg.MasterAddress, msCfg.MasterPort),
+				mst,
 				grpc.WithTimeout(connTimeout),
 				grpc.WithInsecure())
 			if err != nil {
-				return fmt.Errorf("cannot connect to master: %v", err)
+				return nil, fmt.Errorf("cannot connect to master: %v", err)
 			}
 
-			pb.RegisterPubSubServer(svr, NewSlaveServer(pb.NewPubSubClient(conn)))
+			slv := NewSlaveServer(conn)
+			pb.RegisterPubSubServer(svr, slv)
+			pb.RegisterMasterSidecarServer(svr, slv)
 		}
 
-		return nil
+		return svr, nil
 	}
 
-	return fmt.Errorf("current user config is not supported exclusively")
+	return nil, fmt.Errorf("current user config is not supported exclusively")
 }

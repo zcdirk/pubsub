@@ -10,5 +10,6 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=build /app/bin/pubsub /app
 
+ENV CONFIG=""
 EXPOSE 7476
-ENTRYPOINT ./pubsub
+ENTRYPOINT ./pubsub --config=$CONFIG

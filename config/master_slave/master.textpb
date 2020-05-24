@@ -1,5 +1,5 @@
-port: 3000
 replication_mode: MASTER_SLAVE
+port: 7476
 master_slave_config: {
   mode: MASTER
 }

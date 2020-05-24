@@ -8,16 +8,11 @@ import (
 	"net"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
-
 	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
 	"github.com/cs244b-2020-spring-pubsub/pubsub/server"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/protobuf/encoding/prototext"
-)
-
-const (
-	defaultPort = 7476
 )
 
 var (
@@ -27,10 +22,9 @@ var (
 func main() {
 	flag.Parse()
 
-	cfg := &pb.ServerConfig{
-		Port: defaultPort,
-	}
+	cfg := &pb.ServerConfig{}
 
+	log.Printf("config path: %s", *path)
 	content, err := ioutil.ReadFile(*path)
 	if err != nil {
 		log.Fatalf("cannot read server config")
@@ -40,11 +34,12 @@ func main() {
 		log.Fatalf("cannot parse server config")
 	}
 
-	svr := grpc.NewServer(grpc.KeepaliveParams(keepalive.ServerParameters{
-		MaxConnectionIdle: 5 * time.Minute,
-	}))
+	log.Printf("server config: %s", cfg)
 
-	err = server.ConfigurePubsubServer(svr, cfg)
+	svr, err := server.CreatePubsubServer(cfg,
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: 5 * time.Minute,
+		}))
 	if err != nil {
 		log.Fatalf("failed to configure server: %v", err)
 	}

@@ -6,56 +6,61 @@ import (
 	"sync"
 
 	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc"
 )
 
-type masterSlaveServer struct {
-	singleMachineServer
-}
-
-func (s *masterSlaveServer) Subscribe(req *pb.SubscribeRequest, stream pb.PubSub_SubscribeServer) error {
-	for _, t := range req.Topic {
-		t.Name = "user-" + t.Name
-	}
-	return s.singleMachineServer.Subscribe(req, stream)
-}
-
-type masterServer struct {
-	masterSlaveServer
+type MasterServer struct {
+	SingleMachineServer
+	slaves []chan *pb.SlaveSubscribeResponse
 }
 
 // NewMasterServer creates master server in master-slave mode.
-func NewMasterServer() pb.PubSubServer {
-	return &masterServer{
-		masterSlaveServer: masterSlaveServer{
-			singleMachineServer: singleMachineServer{&sync.Map{}},
-		},
+func NewMasterServer() *MasterServer {
+	return &MasterServer{
+		SingleMachineServer: SingleMachineServer{&sync.Map{}},
+		slaves:              []chan *pb.SlaveSubscribeResponse{},
 	}
 }
 
-func (s *masterServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
-	req.Topic.Name = "user-" + req.Topic.Name
-	if chs, ok := s.m.Load("sys-slave"); ok {
-		for _, c := range chs.([]chan *pb.Message) {
-			c <- &pb.Message{Content: req.String()}
+// Publish a message
+func (s *MasterServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
+	for _, c := range s.slaves {
+		c <- &pb.SlaveSubscribeResponse{
+			Topic: req.Topic,
+			Msg:   req.Msg,
 		}
 	}
 
-	return s.singleMachineServer.Publish(ctx, req)
+	return s.SingleMachineServer.Publish(ctx, req)
 }
 
-type slaveServer struct {
-	masterSlaveServer
-	mst pb.PubSubClient
+// SubscribeFromMaster allows slaves to subscribe to master
+func (s *MasterServer) SubscribeFromMaster(req *pb.SlaveSubscribeRequest, stream pb.MasterSidecar_SubscribeFromMasterServer) error {
+	c := make(chan *pb.SlaveSubscribeResponse)
+	s.slaves = append(s.slaves, c)
+
+	for {
+		msg := <-c
+		log.Printf("incoming message to slave %s", msg)
+		if err := stream.Send(msg); err != nil {
+			log.Printf("failed to publish: %v\n", err)
+			return err
+		}
+	}
+}
+
+type SlaveServer struct {
+	MasterServer
+	mst   pb.PubSubClient
+	mstSc pb.MasterSidecarClient
 }
 
 // NewSlaveServer creates slave server in master-slave mode.
-func NewSlaveServer(mst pb.PubSubClient) pb.PubSubServer {
-	svr := &slaveServer{
-		masterSlaveServer: masterSlaveServer{
-			singleMachineServer: singleMachineServer{&sync.Map{}},
-		},
-		mst: mst,
+func NewSlaveServer(conn *grpc.ClientConn) *SlaveServer {
+	svr := &SlaveServer{
+		MasterServer: *NewMasterServer(),
+		mst:          pb.NewPubSubClient(conn),
+		mstSc:        pb.NewMasterSidecarClient(conn),
 	}
 
 	if err := svr.init(); err != nil {
@@ -65,11 +70,8 @@ func NewSlaveServer(mst pb.PubSubClient) pb.PubSubServer {
 	return svr
 }
 
-func (s *slaveServer) init() error {
-	stream, err := s.mst.Subscribe(context.Background(),
-		&pb.SubscribeRequest{
-			Topic: []*pb.Topic{&pb.Topic{Name: "sys-slave"}},
-		})
+func (s *SlaveServer) init() error {
+	stream, err := s.mstSc.SubscribeFromMaster(context.Background(), &pb.SlaveSubscribeRequest{})
 
 	if err != nil {
 		return err
@@ -83,14 +85,9 @@ func (s *slaveServer) init() error {
 				log.Fatal(err)
 			}
 
-			req := &pb.PublishRequest{}
-			if err := proto.UnmarshalText(res.Msg.Content, req); err != nil {
-				log.Fatalf("cannot unmarshal publish request from master: %s", err)
-			}
-
-			if chs, ok := s.m.Load(req.Topic.Name); ok {
+			if chs, ok := s.m.Load(res.Topic.Name); ok {
 				for _, c := range chs.([]chan *pb.Message) {
-					c <- req.Msg
+					c <- res.Msg
 				}
 			}
 		}
@@ -99,7 +96,7 @@ func (s *slaveServer) init() error {
 	return nil
 }
 
-func (s *slaveServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
+func (s *SlaveServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
 	log.Printf("publish reroute to master %s", req)
 	return s.mst.Publish(ctx, req)
 }
