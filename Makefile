@@ -31,12 +31,6 @@ single-machine-up:
 single-machine-down:
 	docker-compose -f simulation/single-machine.yaml down
 
-single-machine-restart:
-	docker-compose -f simulation/single-machine.yaml restart
-
-single-machine-bench:
-	go test -bench=BenchmarkSingleMachine -benchtime=100x -v ./simulation/...
-
 master-slave-up:
 	docker-compose -f simulation/master-slave.yaml up -d --remove-orphans
 
