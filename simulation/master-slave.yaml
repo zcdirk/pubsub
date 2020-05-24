@@ -1,8 +1,6 @@
 version: '3.2'
 services:
   master:
-    build: 
-      context: ../
     image: pubsub
     ports: 
     - "7476:7476"
@@ -31,8 +29,6 @@ services:
   slave-1:
     depends_on:
     - master
-    build: 
-      context: ../
     image: pubsub
     ports: 
     - "7478:7476"
@@ -46,8 +42,6 @@ services:
   slave-2:
     depends_on:
     - slave-0
-    build: 
-      context: ../
     image: pubsub
     ports: 
     - "7479:7476"

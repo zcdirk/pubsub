@@ -25,14 +25,14 @@ client: pb
 docker:
 	docker build -t pubsub .
 
-single-machine-up:
-	docker-compose -f simulation/single-machine.yaml up -d --build --remove-orphans
+single-machine-up: docker
+	docker-compose -f simulation/single-machine.yaml up -d --remove-orphans
 
 single-machine-down:
 	docker-compose -f simulation/single-machine.yaml down
 
-master-slave-up:
-	docker-compose -f simulation/master-slave.yaml up -d --build --remove-orphans
+master-slave-up: docker
+	docker-compose -f simulation/master-slave.yaml up -d --remove-orphans
 
 master-slave-down:
 	docker-compose -f simulation/master-slave.yaml down
