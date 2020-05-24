@@ -16,3 +16,6 @@ vendor/
 
 # Binaries
 bin/
+
+# Mock
+mock

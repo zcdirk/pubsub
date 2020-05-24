@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+option go_package = "proto;proto";
+
+package pubsub;
+
+import "proto/pubsub.proto";
+
+// The request message for subscribe
+message SlaveSubscribeRequest {}
+
+// The response message for subscribe
+message SlaveSubscribeResponse {
+    // Topic
+    Topic topic = 1;
+
+    // Message
+    Message msg = 2; 
+}
+
+// PubSub service defination
+service MasterSidecar {
+  // Subscribe to a master
+  rpc SubscribeFromMaster(SlaveSubscribeRequest) returns (stream SlaveSubscribeResponse) {}
+}

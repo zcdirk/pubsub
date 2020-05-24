@@ -1,7 +1,9 @@
 FROM golang:alpine AS build
 WORKDIR /app
 ADD . /app
-RUN apk update && apk add make protoc
+RUN apk update
+RUN apk add build-base
+RUN apk add grpc-dev
 RUN cd /app && \
     make dependencies && \
     make server
@@ -10,5 +12,5 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=build /app/bin/pubsub /app
 
-EXPOSE 7476
-ENTRYPOINT ./pubsub
+ENV CONFIG=""
+ENTRYPOINT ./pubsub --config=$CONFIG

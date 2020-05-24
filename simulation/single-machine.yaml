@@ -1,0 +1,12 @@
+version: '3.2'
+services:
+  pubsub:
+    image: pubsub
+    ports: 
+    - "7476:7476"
+    volumes:
+    - type: bind
+      source: ./config/single_machine
+      target: /config
+    environment:
+    - CONFIG=/config/server.textpb
