@@ -11,10 +11,12 @@ import (
 )
 
 func BenchmarkSingleMachine(b *testing.B) {
-	sub := pb.NewPubSubClient(createPubSubConn(b, ":7476"))
 	ec := make(chan error)
+
 	for i := 0; i < b.N; i++ {
 		go func() {
+			sub := pb.NewPubSubClient(createPubSubConn(b, ":7476"))
+
 			stream, err := sub.Subscribe(context.Background(), &pb.SubscribeRequest{Topic: []*pb.Topic{topic}})
 			if err != nil {
 				ec <- err
