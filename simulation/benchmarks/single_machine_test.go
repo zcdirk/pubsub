@@ -8,12 +8,6 @@ import (
 	"time"
 
 	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
-	"google.golang.org/grpc"
-)
-
-var (
-	n     = 100
-	topic = &pb.Topic{Name: "sum"}
 )
 
 func BenchmarkSingleMachine(b *testing.B) {
@@ -23,16 +17,7 @@ func BenchmarkSingleMachine(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		go func() {
-			conn, err := grpc.Dial(
-				":7476",
-				grpc.WithTimeout(10*time.Second),
-				grpc.WithInsecure())
-
-			if err != nil {
-				b.Fatalf("cannot create connection to cluster: %s", err)
-			}
-
-			sub := pb.NewPubSubClient(conn)
+			sub := pb.NewPubSubClient(createPubSubConn(b))
 
 			stream, err := sub.Subscribe(context.Background(), &pb.SubscribeRequest{Topic: []*pb.Topic{topic}})
 			if err != nil {
@@ -61,17 +46,7 @@ func BenchmarkSingleMachine(b *testing.B) {
 	time.Sleep(5 * time.Second)
 	b.ResetTimer()
 
-	conn, err := grpc.Dial(
-		":7476",
-		grpc.WithTimeout(10*time.Second),
-		grpc.WithInsecure())
-
-	if err != nil {
-		b.Fatalf("cannot create connection to cluster: %s", err)
-	}
-
-	pub := pb.NewPubSubClient(conn)
-
+	pub := pb.NewPubSubClient(createPubSubConn(b))
 	for i := 1; i <= n; i++ {
 		if _, err := pub.Publish(context.Background(), &pb.PublishRequest{
 			Topic: topic,
