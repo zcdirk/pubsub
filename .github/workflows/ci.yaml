@@ -19,3 +19,9 @@ jobs:
       run: make dependencies
     - name: test
       run: make test
+    - name: single-machine-benchmark
+      run: |
+        make docker
+        make single-machine-up
+        sleep 3
+        make single-machine-bench

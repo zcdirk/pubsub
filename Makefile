@@ -25,13 +25,19 @@ client: pb
 docker:
 	docker build -t pubsub .
 
-single-machine-up: docker
+single-machine-up: 
 	docker-compose -f simulation/single-machine.yaml up -d --remove-orphans
 
 single-machine-down:
 	docker-compose -f simulation/single-machine.yaml down
 
-master-slave-up: docker
+single-machine-restart:
+	docker-compose -f simulation/single-machine.yaml restart
+
+single-machine-bench:
+	go test -bench=BenchmarkSingleMachine -benchtime=100x -v ./simulation/...
+
+master-slave-up:
 	docker-compose -f simulation/master-slave.yaml up -d --remove-orphans
 
 master-slave-down:
