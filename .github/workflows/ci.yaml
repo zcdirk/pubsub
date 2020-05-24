@@ -23,7 +23,7 @@ jobs:
   single-machine-benchmark:
     strategy:
       matrix:
-        number-of-client: [10x, 25x, 50x, 80x, 100x, 200x]
+        number-of-client: [10x, 25x, 50x, 80x, 100x, 200x, 500x]
     runs-on: ubuntu-latest
     steps:
     - name: checkout-code
