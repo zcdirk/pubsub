@@ -37,6 +37,8 @@ func BenchmarkSingleMachine(b *testing.B) {
 				ec <- fmt.Errorf("data was compromised in process, want: %d, but got: %d", want, got)
 				return
 			}
+
+			ec <- nil
 		}()
 	}
 
