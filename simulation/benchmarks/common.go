@@ -3,7 +3,8 @@ package benchmarks
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,84 +13,72 @@ import (
 )
 
 var (
-	n     = 20
-	want  = n * (n - 1) / 2
-	topic = &pb.Topic{Name: "sum"}
+	word  = strings.Split("pubsub", "")
+	topic = &pb.Topic{Name: "topic"}
 )
 
-func createPubSubConn(b *testing.B, svr string) *grpc.ClientConn {
-	conn, err := grpc.Dial(
-		svr,
-		grpc.WithTimeout(10*time.Second),
-		grpc.WithInsecure())
-
-	if err != nil {
-		b.Fatalf("cannot create connection to cluster: %s", err)
-	}
-
-	return conn
-}
-
-func createPubSubBenchmark(b *testing.B, svr []string) {
+func runPubSubBenchmark(b *testing.B, svr []string) {
 	conn := make([]*grpc.ClientConn, len(svr))
 	for i, s := range svr {
-		conn[i] = createPubSubConn(b, s)
+		c, err := grpc.Dial(
+			s,
+			grpc.WithTimeout(10*time.Second),
+			grpc.WithInsecure())
+
+		if err != nil {
+			b.Fatalf("cannot create connection to cluster: %s", err)
+		}
+
+		conn[i] = c
 	}
 
-	ec := make(chan error)
-	for s := 0; s < b.N; s++ {
-		sub := pb.NewPubSubClient(conn[s%len(svr)])
+	wg := &sync.WaitGroup{}
+	wg.Add(b.N)
 
-		go func() {
+	for s := 0; s < b.N; s++ {
+		go func(sub pb.PubSubClient) {
+			defer wg.Done()
+
 			stream, err := sub.Subscribe(context.Background(), &pb.SubscribeRequest{Topic: []*pb.Topic{topic}})
 			if err != nil {
-				ec <- err
-				return
+				panic(err)
 			}
 
-			got := 0
-			for j := 0; j < n; j++ {
+			for _, w := range word {
 				res, err := stream.Recv()
 				if err != nil {
-					ec <- err
-					return
+					panic(err)
 				}
 
-				x, _ := strconv.Atoi(res.Msg.Content)
-				got += x
+				if res.Msg.Content != w {
+					panic(fmt.Errorf("data was compromised in process, want: %s, but got: %s", w, res.Msg.Content))
+				}
 			}
-
-			if got != want {
-				ec <- fmt.Errorf("data was compromised in process, want: %d, but got: %d", want, got)
-				return
-			}
-
-			ec <- nil
-		}()
+		}(pb.NewPubSubClient(conn[s%len(svr)]))
 	}
 
 	time.Sleep(5 * time.Second)
 
-	b.StartTimer()
+	for p, x := range word {
+		pub := pb.NewPubSubClient(conn[p%len(svr)])
 
-	for i := 0; i < n; i++ {
-		b.Logf("publish number %d using client %d", i, i%len(svr))
-		pub := pb.NewPubSubClient(conn[i%len(svr)])
 		if _, err := pub.Publish(context.Background(), &pb.PublishRequest{
 			Topic: topic,
-			Msg:   &pb.Message{Content: strconv.Itoa(i)},
+			Msg:   &pb.Message{Content: x},
 		}); err != nil {
 			b.Fatalf("cannot publish to topic: %s", err)
 		}
 	}
 
-	for p := 0; p < b.N; p++ {
-		if err := <-ec; err != nil {
-			b.Fatalf("client error: %s", err)
-		}
+	completed := make(chan interface{})
+	go func() {
+		wg.Wait()
+		completed <- "done"
+	}()
 
-		b.Logf("%d client(s) have completed", p+1)
+	select {
+	case <-completed:
+	case <-time.After(5 * time.Minute):
+		b.FailNow()
 	}
-
-	b.StopTimer()
 }
