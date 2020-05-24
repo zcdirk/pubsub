@@ -4,8 +4,9 @@ jobs:
   single-machine-benchmark:
     strategy:
       matrix:
-        number-of-client: [500x, 1000x, 2000x]
+        number-of-client: [100x, 200x, 500x]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
     - name: checkout-code
       uses: actions/checkout@v2
@@ -15,13 +16,14 @@ jobs:
       run: |
         make single-machine-up
         sleep 5
-        go test -bench=BenchmarkSingleMachine -count=3 -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
+        go test -bench=BenchmarkSingleMachine -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
     
   master-slave-benchmark:
     strategy:
       matrix:
-        number-of-client: [1500x, 3000x, 5000x]
+        number-of-client: [300x, 750x, 1500x]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
     - name: checkout-code
       uses: actions/checkout@v2
@@ -31,4 +33,4 @@ jobs:
       run: |
         make master-slave-up
         sleep 5
-        go test -bench=BenchmarkMasterSlave -count=3 -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
+        go test -bench=BenchmarkMasterSlave -benchtime=${{ matrix.number-of-client }} -v ./simulation/...

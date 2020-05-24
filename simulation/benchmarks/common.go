@@ -70,15 +70,5 @@ func runPubSubBenchmark(b *testing.B, svr []string) {
 		}
 	}
 
-	completed := make(chan interface{})
-	go func() {
-		wg.Wait()
-		completed <- "done"
-	}()
-
-	select {
-	case <-completed:
-	case <-time.After(5 * time.Minute):
-		b.FailNow()
-	}
+	wg.Wait()
 }
