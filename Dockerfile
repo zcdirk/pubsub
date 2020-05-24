@@ -14,5 +14,4 @@ WORKDIR /app
 COPY --from=build /app/bin/pubsub /app
 
 ENV CONFIG=""
-EXPOSE 7476
 ENTRYPOINT ./pubsub --config=$CONFIG
