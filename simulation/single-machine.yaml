@@ -3,6 +3,7 @@ services:
   pubsub:
     build: 
       context: ../
+    image: pubsub
     ports: 
     - "7476:7476"
     volumes:
