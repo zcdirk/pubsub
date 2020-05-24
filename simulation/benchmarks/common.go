@@ -14,9 +14,9 @@ var (
 	topic = &pb.Topic{Name: "sum"}
 )
 
-func createPubSubConn(b *testing.B) *grpc.ClientConn {
+func createPubSubConn(b *testing.B, svr string) *grpc.ClientConn {
 	conn, err := grpc.Dial(
-		":7476",
+		svr,
 		grpc.WithTimeout(10*time.Second),
 		grpc.WithInsecure())
 

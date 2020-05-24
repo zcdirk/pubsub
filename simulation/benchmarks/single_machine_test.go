@@ -11,7 +11,7 @@ import (
 )
 
 func BenchmarkSingleMachine(b *testing.B) {
-	sub := pb.NewPubSubClient(createPubSubConn(b))
+	sub := pb.NewPubSubClient(createPubSubConn(b, ":7476"))
 	ec := make(chan error)
 	for i := 0; i < b.N; i++ {
 		go func() {
@@ -44,7 +44,7 @@ func BenchmarkSingleMachine(b *testing.B) {
 
 	b.StartTimer()
 
-	pub := pb.NewPubSubClient(createPubSubConn(b))
+	pub := pb.NewPubSubClient(createPubSubConn(b, ":7476"))
 	for i := 1; i <= n; i++ {
 		if _, err := pub.Publish(context.Background(), &pb.PublishRequest{
 			Topic: topic,

@@ -10,7 +10,7 @@ dependencies:
 pb:
 	protoc proto/*.proto --go_out=plugins=grpc:.
 
-mock: pb
+mock:
 	mockgen -destination mock/pubsub_mock.go github.com/cs244b-2020-spring-pubsub/pubsub/proto PubSub_SubscribeServer,PubSubServer,PubSubClient
 
 test: mock
