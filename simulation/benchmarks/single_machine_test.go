@@ -44,7 +44,8 @@ func BenchmarkSingleMachine(b *testing.B) {
 	}
 
 	time.Sleep(5 * time.Second)
-	b.ResetTimer()
+
+	b.StartTimer()
 
 	pub := pb.NewPubSubClient(createPubSubConn(b))
 	for i := 1; i <= n; i++ {
@@ -57,4 +58,6 @@ func BenchmarkSingleMachine(b *testing.B) {
 	}
 
 	wg.Wait()
+
+	b.StopTimer()
 }
