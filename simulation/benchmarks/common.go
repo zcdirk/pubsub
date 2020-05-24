@@ -3,7 +3,6 @@ package benchmarks
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -14,7 +13,7 @@ import (
 
 var (
 	n     = 100
-	want  = n * (n + 1) / 2
+	want  = n * (n - 1) / 2
 	topic = &pb.Topic{Name: "sum"}
 )
 
@@ -35,8 +34,9 @@ func createBenchmark(b *testing.B, svr []string) {
 	ec := make(chan error)
 
 	for i := 0; i < b.N; i++ {
+		s := i % len(svr)
 		go func() {
-			sub := pb.NewPubSubClient(createPubSubConn(b, svr[rand.Intn(len(svr))]))
+			sub := pb.NewPubSubClient(createPubSubConn(b, svr[s]))
 
 			stream, err := sub.Subscribe(context.Background(), &pb.SubscribeRequest{Topic: []*pb.Topic{topic}})
 			if err != nil {
@@ -74,8 +74,8 @@ func createBenchmark(b *testing.B, svr []string) {
 		pub[i] = pb.NewPubSubClient(createPubSubConn(b, s))
 	}
 
-	for i := 1; i <= n; i++ {
-		if _, err := pub[rand.Intn(len(pub))].Publish(context.Background(), &pb.PublishRequest{
+	for i := 0; i < n; i++ {
+		if _, err := pub[i%len(pub)].Publish(context.Background(), &pb.PublishRequest{
 			Topic: topic,
 			Msg:   &pb.Message{Content: strconv.Itoa(i)},
 		}); err != nil {
