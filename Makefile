@@ -31,11 +31,17 @@ single-machine-up:
 single-machine-down:
 	docker-compose -f simulation/single-machine.yaml down
 
+single-machine-restart:
+	docker-compose -f simulation/single-machine.yaml restart
+
 master-slave-up:
 	docker-compose -f simulation/master-slave.yaml up -d
 
 master-slave-down:
 	docker-compose -f simulation/master-slave.yaml down
+
+master-slave-restart:
+	docker-compose -f simulation/master-slave.yaml restart
 
 clean:
 	rm -rf bin
