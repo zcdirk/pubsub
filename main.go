@@ -10,13 +10,21 @@ import (
 
 	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
 	"github.com/cs244b-2020-spring-pubsub/pubsub/server"
+	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
 var (
-	path = flag.String("config", "", "path to pubsub server config")
+	path       = flag.String("config", "", "path to pubsub server config")
+	defaultCfg = &pb.ServerConfig{
+		Port: 7476,
+		MasterSlaveConfig: &pb.ServerConfig_MasterSlaveConfig{
+			MasterPort:    7476,
+			MasterTimeout: "10s",
+		},
+	}
 )
 
 func main() {
@@ -33,6 +41,8 @@ func main() {
 	if prototext.Unmarshal(content, cfg) != nil {
 		log.Fatalf("cannot parse server config")
 	}
+
+	proto.Merge(cfg, defaultCfg)
 
 	log.Printf("server config: %s", cfg)
 
