@@ -9,35 +9,44 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	slaveTag = "slave"
+)
+
+// MasterServer implements master nodes in master-slave mode.
 type MasterServer struct {
 	SingleMachineServer
-	slaves []chan *pb.SlaveSubscribeResponse
+	slaves *sync.Map
 }
 
 // NewMasterServer creates master server in master-slave mode.
 func NewMasterServer() *MasterServer {
+	slv := &sync.Map{}
+	slv.Store(slaveTag, []chan *pb.SlaveSubscribeResponse{})
 	return &MasterServer{
 		SingleMachineServer: SingleMachineServer{&sync.Map{}},
-		slaves:              []chan *pb.SlaveSubscribeResponse{},
+		slaves:              slv,
 	}
 }
 
 // Publish a message
 func (s *MasterServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
-	for _, c := range s.slaves {
+	slv, _ := s.slaves.Load(slaveTag)
+	for _, c := range slv.([]chan *pb.SlaveSubscribeResponse) {
 		c <- &pb.SlaveSubscribeResponse{
 			Topic: req.Topic,
 			Msg:   req.Msg,
 		}
 	}
-
 	return s.SingleMachineServer.Publish(ctx, req)
 }
 
 // SubscribeFromMaster allows slaves to subscribe to master
 func (s *MasterServer) SubscribeFromMaster(req *pb.SlaveSubscribeRequest, stream pb.MasterSidecar_SubscribeFromMasterServer) error {
 	c := make(chan *pb.SlaveSubscribeResponse)
-	s.slaves = append(s.slaves, c)
+
+	slv, _ := s.slaves.Load(slaveTag)
+	s.slaves.Store(slaveTag, append(slv.([]chan *pb.SlaveSubscribeResponse), c))
 
 	for {
 		msg := <-c
@@ -49,6 +58,7 @@ func (s *MasterServer) SubscribeFromMaster(req *pb.SlaveSubscribeRequest, stream
 	}
 }
 
+// SlaveServer implements slave nodes in master-slave mode.
 type SlaveServer struct {
 	MasterServer
 	mst   pb.PubSubClient
@@ -85,6 +95,11 @@ func (s *SlaveServer) init() error {
 				log.Fatal(err)
 			}
 
+			slv, _ := s.slaves.Load(slaveTag)
+			for _, c := range slv.([]chan *pb.SlaveSubscribeResponse) {
+				c <- res
+			}
+
 			if chs, ok := s.m.Load(res.Topic.Name); ok {
 				for _, c := range chs.([]chan *pb.Message) {
 					c <- res.Msg
@@ -96,6 +111,7 @@ func (s *SlaveServer) init() error {
 	return nil
 }
 
+// Publish a message
 func (s *SlaveServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
 	log.Printf("publish reroute to master %s", req)
 	return s.mst.Publish(ctx, req)

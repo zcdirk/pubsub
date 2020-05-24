@@ -8,6 +8,7 @@ import (
 	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
 )
 
+// SingleMachineServer is implementation for PubSub on single machine
 type SingleMachineServer struct {
 	m *sync.Map
 }
