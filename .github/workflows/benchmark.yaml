@@ -3,6 +3,7 @@ on: [push, pull_request]
 jobs:
   single-machine-benchmark:
     strategy:
+      max-parallel: 1
       matrix:
         number-of-client: [500x, 1000x, 3000x]
     runs-on: ubuntu-latest
@@ -20,6 +21,7 @@ jobs:
     
   master-slave-benchmark:
     strategy:
+      max-parallel: 1
       matrix:
         number-of-client: [3000x, 5000x, 10000x]
     runs-on: ubuntu-latest
