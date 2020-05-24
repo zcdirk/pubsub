@@ -26,13 +26,13 @@ docker:
 	docker build -t pubsub .
 
 single-machine-up: 
-	docker-compose -f simulation/single-machine.yaml up -d --remove-orphans
+	docker-compose -f simulation/single-machine.yaml up -d
 
 single-machine-down:
 	docker-compose -f simulation/single-machine.yaml down
 
 master-slave-up:
-	docker-compose -f simulation/master-slave.yaml up -d --remove-orphans
+	docker-compose -f simulation/master-slave.yaml up -d
 
 master-slave-down:
 	docker-compose -f simulation/master-slave.yaml down
