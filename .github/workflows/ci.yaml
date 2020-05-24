@@ -4,7 +4,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.12.x, 1.13.x, 1.14.x]
+        go-version: [1.13.x, 1.14.x]
     runs-on: ubuntu-latest
     steps:
     - name: golang-env-setup
@@ -19,13 +19,19 @@ jobs:
       run: make dependencies
     - name: test
       run: make test
+  
+  benchmark:
+    strategy:
+      matrix:
+        number-of-client: [10x, 25x, 50x, 80x, 100x, 200x]
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout-code
+      uses: actions/checkout@v2
+    - name: build-docker-image
+      run: make docker
     - name: single-machine-benchmark
       run: |
-        make docker
         make single-machine-up
-        for $REP in 10x 25x 50x 80x 100x
-        do
-          make single-machine-restart
-          sleep 3
-          go test -bench=BenchmarkSingleMachine -benchtime=$REP -v ./simulation/...
-        done
+        sleep 3
+        go test -bench=BenchmarkSingleMachine -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
