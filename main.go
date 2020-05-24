@@ -44,7 +44,7 @@ func main() {
 
 	proto.Merge(cfg, defaultCfg)
 
-	log.Printf("server config: %s", cfg)
+	log.Printf("server config: %v", cfg)
 
 	svr, err := server.CreatePubsubServer(cfg,
 		grpc.KeepaliveParams(keepalive.ServerParameters{

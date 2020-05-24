@@ -6,7 +6,7 @@ services:
     - "7476:7476"
     volumes:
     - type: bind
-      source: ../config/master_slave
+      source: ./config/master_slave
       target: /config
     environment:
     - CONFIG=/config/master.textpb
@@ -21,7 +21,7 @@ services:
     - "7477:7476"
     volumes:
     - type: bind
-      source: ../config/master_slave
+      source: ./config/master_slave
       target: /config
     environment:
     - CONFIG=/config/slave-0.textpb
@@ -34,7 +34,7 @@ services:
     - "7478:7476"
     volumes:
     - type: bind
-      source: ../config/master_slave
+      source: ./config/master_slave
       target: /config
     environment:
     - CONFIG=/config/slave-1.textpb
@@ -47,7 +47,7 @@ services:
     - "7479:7476"
     volumes:
     - type: bind
-      source: ../config/master_slave
+      source: ./config/master_slave
       target: /config
     environment:
     - CONFIG=/config/slave-2.textpb

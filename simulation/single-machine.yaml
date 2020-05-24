@@ -6,7 +6,7 @@ services:
     - "7476:7476"
     volumes:
     - type: bind
-      source: ../config/single_machine
+      source: ./config/single_machine
       target: /config
     environment:
     - CONFIG=/config/server.textpb
