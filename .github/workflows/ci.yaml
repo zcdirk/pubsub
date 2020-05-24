@@ -23,5 +23,9 @@ jobs:
       run: |
         make docker
         make single-machine-up
-        sleep 3
-        make single-machine-bench
+        for $REP in 10x 25x 50x 80x 100x
+        do
+          make single-machine-restart
+          sleep 3
+          go test -bench=BenchmarkSingleMachine -benchtime=$REP -v ./simulation/...
+        done
