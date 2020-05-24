@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	n     = 100
+	n     = 10
 	want  = n * (n - 1) / 2
 	topic = &pb.Topic{Name: "sum"}
 )
@@ -31,13 +31,15 @@ func createPubSubConn(b *testing.B, svr string) *grpc.ClientConn {
 }
 
 func createPubSubBenchmark(b *testing.B, svr []string) {
+	conn := make([]*grpc.ClientConn, len(svr))
+	for i, s := range svr {
+		conn[i] = createPubSubConn(b, s)
+	}
+
 	ec := make(chan error)
-
 	for i := 0; i < b.N; i++ {
-		s := i % len(svr)
+		sub := pb.NewPubSubClient(conn[i%len(svr)])
 		go func() {
-			sub := pb.NewPubSubClient(createPubSubConn(b, svr[s]))
-
 			stream, err := sub.Subscribe(context.Background(), &pb.SubscribeRequest{Topic: []*pb.Topic{topic}})
 			if err != nil {
 				ec <- err
@@ -69,13 +71,9 @@ func createPubSubBenchmark(b *testing.B, svr []string) {
 
 	b.StartTimer()
 
-	pub := make([]pb.PubSubClient, len(svr))
-	for i, s := range svr {
-		pub[i] = pb.NewPubSubClient(createPubSubConn(b, s))
-	}
-
 	for i := 0; i < n; i++ {
-		if _, err := pub[i%len(pub)].Publish(context.Background(), &pb.PublishRequest{
+		pub := pb.NewPubSubClient(conn[i%len(svr)])
+		if _, err := pub.Publish(context.Background(), &pb.PublishRequest{
 			Topic: topic,
 			Msg:   &pb.Message{Content: strconv.Itoa(i)},
 		}); err != nil {
