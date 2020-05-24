@@ -4,7 +4,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.13.x, 1.14.x]
+        go-version: [1.12.x, 1.13.x, 1.14.x]
     runs-on: ubuntu-latest
     steps:
     - name: golang-env-setup
@@ -23,7 +23,7 @@ jobs:
   single-machine-benchmark:
     strategy:
       matrix:
-        number-of-client: [10x, 25x, 50x, 80x, 100x, 200x, 500x]
+        number-of-client: [10x, 25x, 50x, 80x, 100x, 200x, 500x, 1000x, 3000x]
     runs-on: ubuntu-latest
     steps:
     - name: checkout-code
