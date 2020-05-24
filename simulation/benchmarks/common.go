@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	word  = strings.Split("pubsub", "")
+	word  = strings.Split("cs244b-2020-spring-pubsub", "")
 	topic = &pb.Topic{Name: "topic"}
 )
 
@@ -58,6 +58,8 @@ func runPubSubBenchmark(b *testing.B, svr []string) {
 	}
 
 	time.Sleep(5 * time.Second)
+
+	b.ResetTimer()
 
 	for p, x := range word {
 		pub := pb.NewPubSubClient(conn[p%len(svr)])

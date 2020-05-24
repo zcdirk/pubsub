@@ -4,7 +4,7 @@ jobs:
   single-machine-benchmark:
     strategy:
       matrix:
-        number-of-client: [100x, 200x, 500x]
+        number-of-client: [500x]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -21,7 +21,7 @@ jobs:
   master-slave-benchmark:
     strategy:
       matrix:
-        number-of-client: [300x, 750x, 1500x]
+        number-of-client: [1500x]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
