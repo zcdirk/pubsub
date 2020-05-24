@@ -5,7 +5,7 @@ import (
 )
 
 func BenchmarkMasterSlave(b *testing.B) {
-	createBenchmark(b, []string{
+	createPubSubBenchmark(b, []string{
 		":7476",
 		":7477",
 		":7478",

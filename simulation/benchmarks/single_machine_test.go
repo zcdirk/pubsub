@@ -5,5 +5,5 @@ import (
 )
 
 func BenchmarkSingleMachine(b *testing.B) {
-	createBenchmark(b, []string{":7476"})
+	createPubSubBenchmark(b, []string{":7476"})
 }

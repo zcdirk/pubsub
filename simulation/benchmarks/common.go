@@ -30,7 +30,7 @@ func createPubSubConn(b *testing.B, svr string) *grpc.ClientConn {
 	return conn
 }
 
-func createBenchmark(b *testing.B, svr []string) {
+func createPubSubBenchmark(b *testing.B, svr []string) {
 	ec := make(chan error)
 
 	for i := 0; i < b.N; i++ {
