@@ -24,4 +24,3 @@ jobs:
         echo VERSION=$VERSION
         docker tag pubsub $IMAGE_ID:$VERSION
         docker push $IMAGE_ID:$VERSION
-        docker push $IMAGE_ID

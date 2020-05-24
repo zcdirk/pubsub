@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	n     = 10
+	n     = 20
 	want  = n * (n - 1) / 2
 	topic = &pb.Topic{Name: "sum"}
 )
@@ -37,8 +37,9 @@ func createPubSubBenchmark(b *testing.B, svr []string) {
 	}
 
 	ec := make(chan error)
-	for i := 0; i < b.N; i++ {
-		sub := pb.NewPubSubClient(conn[i%len(svr)])
+	for s := 0; s < b.N; s++ {
+		sub := pb.NewPubSubClient(conn[s%len(svr)])
+
 		go func() {
 			stream, err := sub.Subscribe(context.Background(), &pb.SubscribeRequest{Topic: []*pb.Topic{topic}})
 			if err != nil {
@@ -72,6 +73,7 @@ func createPubSubBenchmark(b *testing.B, svr []string) {
 	b.StartTimer()
 
 	for i := 0; i < n; i++ {
+		b.Logf("publish number %d using client %d", i, i%len(svr))
 		pub := pb.NewPubSubClient(conn[i%len(svr)])
 		if _, err := pub.Publish(context.Background(), &pb.PublishRequest{
 			Topic: topic,
@@ -81,10 +83,12 @@ func createPubSubBenchmark(b *testing.B, svr []string) {
 		}
 	}
 
-	for i := 0; i < b.N; i++ {
+	for p := 0; p < b.N; p++ {
 		if err := <-ec; err != nil {
 			b.Fatalf("client error: %s", err)
 		}
+
+		b.Logf("%d client(s) have completed", p+1)
 	}
 
 	b.StopTimer()
