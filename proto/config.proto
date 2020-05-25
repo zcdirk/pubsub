@@ -9,6 +9,7 @@ message ServerConfig {
   enum ReplicationMode {
     SINGLE_MACHINE = 0;
     MASTER_SLAVE = 1;
+    RAFT_MACHINE = 2;
   }
 
   // PubSub service port

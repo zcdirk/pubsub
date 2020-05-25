@@ -6,10 +6,10 @@ package pubsub;
 
 import "proto/pubsub.proto";
 
-// The request message for subscribe
+// The request message for slave subscribe
 message SlaveSubscribeRequest {}
 
-// The response message for subscribe
+// The response message for slave subscribe
 message SlaveSubscribeResponse {
     // Topic
     Topic topic = 1;
@@ -18,8 +18,9 @@ message SlaveSubscribeResponse {
     Message msg = 2; 
 }
 
-// PubSub service defination
+// Service definition for master-slave's sidecar
 service MasterSidecar {
   // Subscribe to a master
+  // The slave will send request to master on init. The master will respond with the publish messages it receives.
   rpc SubscribeFromMaster(SlaveSubscribeRequest) returns (stream SlaveSubscribeResponse) {}
 }

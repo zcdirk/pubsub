@@ -47,6 +47,10 @@ func CreatePubsubServer(cfg *pb.ServerConfig, opts ...grpc.ServerOption) (*grpc.
 		}
 
 		return svr, nil
+
+	case pb.ServerConfig_RAFT_MACHINE:
+		pb.RegisterPubSubServer(svr, NewRaftServer())
+		return svr, nil
 	}
 
 	return nil, fmt.Errorf("current user config is not supported exclusively")
