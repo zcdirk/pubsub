@@ -9,7 +9,7 @@ import (
 // RaftSever is implementation for PubSub
 type RaftServer struct {
 	SingleMachineServer
-	id    uint64
+	id    string  // addr:port
 	peers *sync.Map
 }
 
