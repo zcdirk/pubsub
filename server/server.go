@@ -49,7 +49,9 @@ func CreatePubsubServer(cfg *pb.ServerConfig, opts ...grpc.ServerOption) (*grpc.
 		return svr, nil
 
 	case pb.ServerConfig_RAFT:
-		pb.RegisterPubSubServer(svr, NewRaftServer())
+		raft := NewRaftServer(cfg)
+		pb.RegisterPubSubServer(svr, raft)
+		pb.RegisterRaftSidecarServer(svr, raft)
 		return svr, nil
 	}
 
