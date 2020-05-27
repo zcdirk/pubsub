@@ -15,12 +15,15 @@ import (
 // RaftSever is implementation for PubSub
 type RaftServer struct {
 	SingleMachineServer
-	id     string // addr:port
-	peers  *sync.Map
-	role   pb.Role
-	term uint64
-	leaderId string
-	heartbeatTimeout time.Duration
+	id                string // addr:port
+	peers             *sync.Map
+	peerNum			  uint64
+	role              pb.Role
+	term              uint64
+	leaderId          string
+	heartbeatInterval time.Duration
+	ticker            *time.Ticker
+	log               []*pb.LogEntry
 }
 
 func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
@@ -30,12 +33,13 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	id := fmt.Sprintf("%s:%d", conn.LocalAddr().(*net.UDPAddr).IP.String() , cfg.RaftConfig.Port)
+	id := fmt.Sprintf("%s:%d", conn.LocalAddr().(*net.UDPAddr).IP.String(), cfg.RaftConfig.Port)
 
 	// Parse peers
 	peers := &sync.Map{}
 	timeout, err := time.ParseDuration("10m")
-	for _, peer := range strings.Split(cfg.RaftConfig.Peers, ";") {
+	peerStrs := strings.Split(cfg.RaftConfig.Peers, ";")
+	for _, peer := range peerStrs {
 		go func() {
 			log.Printf("connect to peer: %s", peer)
 			conn, err := grpc.Dial(
@@ -49,15 +53,23 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 		}()
 	}
 
-	heartbeatTimeout, _ := time.ParseDuration(cfg.RaftConfig.HeartbeatTimeout)
+	// Parse heart beat interval
+	heartbeatInterval, _ := time.ParseDuration(cfg.RaftConfig.HeartbeatInterval)
 
-	return &RaftServer{
-		id: id,
-		peers: peers,
-		role: pb.Role_Candidate,
-		term: 0,
-		heartbeatTimeout: heartbeatTimeout,
+	svr := &RaftServer{
+		id:                id,
+		peers:             peers,
+		peerNum: 		   uint64(len(peerStrs)),
+		role:              pb.Role_Candidate,
+		term:              0,
+		heartbeatInterval: heartbeatInterval,
+		log:               []*pb.LogEntry{},
 	}
+
+	// Set ticker
+	svr.ticker = time.NewTicker(svr.getTimeOut())
+	go svr.heartBeat(context.Background())
+	return svr
 }
 
 // Publish a message
@@ -72,4 +84,68 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 
 func (s *RaftServer) RequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
 	return &pb.RequestVoteResponse{}, nil
+}
+
+func (s *RaftServer) heartBeat(ctx context.Context) {
+	for {
+		select {
+		case <-s.ticker.C:
+			switch s.role {
+			case pb.Role_Leader:
+				// Send heart beat request to all the followers
+				s.peers.Range(func(k, v interface{}) bool {
+					v.(pb.RaftSidecarClient).AppendEntries(ctx, &pb.AppendEntriesRequest{})
+					return true
+				})
+			case pb.Role_Follower, pb.Role_Candidate:
+				if s.role == pb.Role_Follower {
+					s.term++
+				}
+				// Change to candidate and request vote
+				s.role = pb.Role_Candidate
+				voteChannel, voteNum := make(chan bool), uint64(0)
+				s.peers.Range(func(k, v interface{}) bool {
+					req, _ := v.(pb.RaftSidecarClient).RequestVote(ctx, &pb.RequestVoteRequest{
+						Term:         s.term,
+						CandidateId:  s.id,
+						LastLogIndex: uint64(len(s.log)),
+						LastLogTerm:  s.log[len(s.log) - 1].Term,
+					})
+					if req.VoteGranted {
+						voteChannel <- req.VoteGranted
+					}
+					return true
+				})
+				timer := time.NewTimer(s.getTimeOut())
+				for s.role == pb.Role_Candidate && !s.isMajority(voteNum) && !Expired(timer) {
+					<-voteChannel
+					voteNum++
+				}
+				if s.role == pb.Role_Candidate && s.isMajority(voteNum) && !Expired(timer){
+					// Upgrade to leader
+					s.role = pb.Role_Leader
+					s.heartBeat(ctx)
+					s.ticker = time.NewTicker(s.heartbeatInterval)
+				}
+			}
+		}
+
+	}
+}
+
+func Expired(T *time.Timer) bool {
+	select {
+	case <-T.C:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *RaftServer) isMajority(voteNum uint64) bool {
+	return voteNum > s.peerNum / 2
+}
+
+func (s *RaftServer) getTimeOut() time.Duration {
+	return s.heartbeatInterval * 3
 }
