@@ -4,7 +4,7 @@ option go_package = "proto;proto";
 
 package pubsub;
 
-// PubSub service defination
+// PubSub service definition
 service PubSub {
   // Publish a message
   rpc Publish(PublishRequest) returns (PublishResponse) {}

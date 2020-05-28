@@ -9,6 +9,7 @@ message ServerConfig {
   enum ReplicationMode {
     SINGLE_MACHINE = 0;
     MASTER_SLAVE = 1;
+    RAFT = 2;
   }
 
   // PubSub service port
@@ -44,4 +45,18 @@ message ServerConfig {
   // the service is replicated through
   // master-slave mode.
   MasterSlaveConfig master_slave_config = 3;
+
+  message RaftConfig {
+    // Port the raft node used for sidecar service
+    int32 port = 1;
+
+    // Peer address in form of "addr1:port1;addr2:port2"
+    string peers = 2;
+
+    // Interval of heartbeat.
+    string heartbeat_interval = 3;
+  }
+
+  // Config fragment for PubSub if the service is replicated through raft mode.
+  RaftConfig raft_config = 4;
 }
