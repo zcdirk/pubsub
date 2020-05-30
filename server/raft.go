@@ -3,17 +3,18 @@ package server
 import (
 	"context"
 	"fmt"
-	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
-	"google.golang.org/grpc"
 	"log"
 	"math/rand"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	pb "github.com/cs244b-2020-spring-pubsub/pubsub/proto"
+	"google.golang.org/grpc"
 )
 
-// RaftSever is implementation for PubSub
+// RaftServer implementation for PubSub
 type RaftServer struct {
 	SingleMachineServer
 	id                string // addr:port
@@ -21,32 +22,39 @@ type RaftServer struct {
 	peerNum           uint64
 	role              pb.Role
 	term              uint64
-	leaderId          string
+	leaderID          string
 	heartbeatInterval time.Duration
 	ticker            *time.Ticker
 	log               []*pb.LogEntry
 	voteFor           string
 }
 
+// Peer structure in Raft implementation.
 type Peer struct {
 	client   pb.PubSubClient
 	sideCar  pb.RaftSidecarClient
 	logIndex int
 }
 
+// NewRaftServer creates new raft server in raft mode.
 func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
-	// Get the id
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		log.Fatal(err)
+	// Set the id
+	var id string
+	if cfg.RaftConfig.Address != "" {
+		id = fmt.Sprintf("%s:%d", cfg.RaftConfig.Address, cfg.Port)
+	} else {
+		conn, err := net.Dial("udp", "8.8.8.8:80")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer conn.Close()
+		id = fmt.Sprintf("%s:%d", conn.LocalAddr().(*net.UDPAddr).IP.String(), cfg.Port)
 	}
-	defer conn.Close()
-	id := fmt.Sprintf("%s:%d", conn.LocalAddr().(*net.UDPAddr).IP.String(), cfg.Port)
 	log.Printf("Server id: %s", id)
 
 	// Parse peers
 	peers := &sync.Map{}
-	timeout, err := time.ParseDuration("10m")
+	timeout, _ := time.ParseDuration("10m")
 	peerStrs := strings.Split(cfg.RaftConfig.Peers, ";")
 	for _, peer := range peerStrs {
 		log.Printf("connect to peer: %s", peer)
@@ -70,13 +78,14 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 	heartbeatInterval, _ := time.ParseDuration(cfg.RaftConfig.HeartbeatInterval)
 
 	svr := &RaftServer{
-		id:                id,
-		peers:             peers,
-		peerNum:           uint64(len(peerStrs)),
-		role:              pb.Role_Candidate,
-		term:              0,
-		heartbeatInterval: heartbeatInterval,
-		log:               []*pb.LogEntry{{Term: 0}}, // Append an empty log entry for prev log index and term
+		SingleMachineServer: SingleMachineServer{&sync.Map{}},
+		id:                  id,
+		peers:               peers,
+		peerNum:             uint64(len(peerStrs)),
+		role:                pb.Role_Candidate,
+		term:                0,
+		heartbeatInterval:   heartbeatInterval,
+		log:                 []*pb.LogEntry{{Term: 0}}, // Append an empty log entry for prev log index and term
 	}
 
 	// Set ticker
@@ -87,10 +96,26 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 
 // Publish a message
 func (s *RaftServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
-	// TODO: Implement the method to redirect the message to leader.
+	// For the initial version, let's block the message if the server is in candidate role.
+	for s.role == pb.Role_Candidate {
+	}
+	log.Printf("publish %+v", req)
+	if s.role == pb.Role_Leader {
+		// Append to log
+		logEntry := &pb.LogEntry{Term: s.term, Topic: req.Topic, Msg: req.Msg}
+		log.Printf("append log: %+v", logEntry)
+		s.log = append(s.log, logEntry)
+		return s.SingleMachineServer.Publish(ctx, req)
+	} else {
+		// Redirect to Leader
+		log.Printf("redirect to leader: %s", s.leaderID)
+		leader, _ := s.peers.Load(s.leaderID)
+		return leader.(*Peer).client.Publish(ctx, req)
+	}
 	return s.SingleMachineServer.Publish(ctx, req)
 }
 
+// AppendEntries appends log entries or deal with heart beat message.
 func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
 	log.Printf("AppendEntries: %+v", req)
 	// Reset ticker
@@ -105,18 +130,18 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 			Info:   "Leader's term need to be updated",
 		}, nil
 	}
-	if len(s.log) <= int(req.PrevLogIndex) || s.log[req.PrevLogIndex].Term != req.PrevLogTerm {
-		return &pb.AppendEntriesResponse{
-			Term:   s.term,
-			Status: pb.AppendEntriesResponse_FAILURE,
-			Info:   "Prev index and term mismatch",
-		}, nil
-	}
 	s.role = pb.Role_Follower
-	s.leaderId = req.LeaderId
+	s.leaderID = req.LeaderId
 	s.term = req.Term
-	s.log = append(s.log[:req.PrevLogIndex+1], req.Entries...)
 	if len(req.Entries) > 0 {
+		if len(s.log) <= int(req.PrevLogIndex) || s.log[req.PrevLogIndex].Term != req.PrevLogTerm {
+			return &pb.AppendEntriesResponse{
+				Term:   s.term,
+				Status: pb.AppendEntriesResponse_FAILURE,
+				Info:   "Prev index and term mismatch",
+			}, nil
+		}
+		s.log = append(s.log[:req.PrevLogIndex+1], req.Entries...)
 		for _, e := range req.Entries {
 			s.SingleMachineServer.Publish(ctx, &pb.PublishRequest{Msg: e.Msg, Topic: e.Topic})
 		}
@@ -127,6 +152,7 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 	}, nil
 }
 
+// RequestVote processes request vote message
 func (s *RaftServer) RequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
 	log.Printf("RequestVote: %+v", req)
 	if s.role != pb.Role_Leader &&
@@ -161,13 +187,13 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 					s.role = pb.Role_Candidate
 				} else {
 					// Sleep a random time to avoid conflict for leader election
-					time.Sleep(s.heartbeatInterval  * time.Duration(rand.Intn(5000)) / time.Duration(1000))
+					time.Sleep(s.heartbeatInterval * time.Duration(rand.Intn(5000)) / time.Duration(1000))
 				}
 				if s.voteFor != "" {
 					continue
 				}
 				// Request vote
-				voteChannel, voteNum := make(chan bool), uint64(0)
+				voteChannel, voteNum := make(chan bool), uint64(1)
 				s.peers.Range(func(k, v interface{}) bool {
 					go func() {
 						log.Printf("node:%s, peer:%+v", k, v)
@@ -209,14 +235,17 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 func (s *RaftServer) sendHeartBeatRequest(ctx context.Context) {
 	s.peers.Range(func(k, v interface{}) bool {
 		req, index := &pb.AppendEntriesRequest{}, v.(*Peer).logIndex
+		req.LeaderId = s.id
+		req.Term = s.term
 		if index <= len(s.log)-1 {
-			req.Term = s.log[index].Term
 			req.Entries = s.log[index:]
-			req.LeaderId = s.id
 			req.PrevLogTerm = s.log[index-1].Term
 			req.PrevLogIndex = uint64(index - 1)
 		}
-		v.(*Peer).sideCar.AppendEntries(ctx, req)
+		res, err := v.(*Peer).sideCar.AppendEntries(ctx, req)
+		if err == nil && res.Status == pb.AppendEntriesResponse_SUCCESS {
+			v.(*Peer).logIndex = len(s.log)
+		}
 		return true
 	})
 }
@@ -231,7 +260,7 @@ func expired(T *time.Timer) bool {
 }
 
 func (s *RaftServer) isMajority(voteNum uint64) bool {
-	return voteNum > (s.peerNum + 1) /2
+	return voteNum > (s.peerNum+1)/2
 }
 
 func (s *RaftServer) getTimeOut() time.Duration {

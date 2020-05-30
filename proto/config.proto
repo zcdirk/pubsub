@@ -47,14 +47,17 @@ message ServerConfig {
   MasterSlaveConfig master_slave_config = 3;
 
   message RaftConfig {
+    // Address of itself
+    string address = 1;
+    
     // Port the raft node used for sidecar service
-    int32 port = 1;
+    int32 port = 2;
 
     // Peer address in form of "addr1:port1;addr2:port2"
-    string peers = 2;
+    string peers = 3;
 
     // Interval of heartbeat.
-    string heartbeat_interval = 3;
+    string heartbeat_interval = 4;
   }
 
   // Config fragment for PubSub if the service is replicated through raft mode.
