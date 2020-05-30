@@ -32,3 +32,19 @@ jobs:
       run: |
         make master-slave-up
         go test -bench=BenchmarkMasterSlave -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
+
+  raft-benchmark:
+    strategy:
+      matrix:
+        number-of-client: [500x]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: checkout-code
+      uses: actions/checkout@v2
+    - name: build-docker-image
+      run: make docker
+    - name: raft-benchmark
+      run: |
+        make raft-up
+        go test -bench=BenchmarkRaft -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
