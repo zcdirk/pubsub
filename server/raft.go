@@ -105,14 +105,15 @@ func (s *RaftServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.P
 		logEntry := &pb.LogEntry{Term: s.term, Topic: req.Topic, Msg: req.Msg}
 		log.Printf("append log: %+v", logEntry)
 		s.log = append(s.log, logEntry)
+		// Broadcast the message immediately
+		s.broadcastPublishRequest(ctx, logEntry)
 		return s.SingleMachineServer.Publish(ctx, req)
-	} else {
-		// Redirect to Leader
-		log.Printf("redirect to leader: %s", s.leaderID)
-		leader, _ := s.peers.Load(s.leaderID)
-		return leader.(*Peer).client.Publish(ctx, req)
 	}
-	return s.SingleMachineServer.Publish(ctx, req)
+
+	// Redirect to Leader
+	log.Printf("redirect to leader: %s", s.leaderID)
+	leader, _ := s.peers.Load(s.leaderID)
+	return leader.(*Peer).client.Publish(ctx, req)
 }
 
 // AppendEntries appends log entries or deal with heart beat message.
@@ -230,6 +231,26 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 		}
 
 	}
+}
+
+func (s *RaftServer) broadcastPublishRequest(ctx context.Context, logEntry *pb.LogEntry) {
+	s.peers.Range(func(k, v interface{}) bool {
+		index := v.(*Peer).logIndex
+		if index == len(s.log)-1 {
+			res, err := v.(*Peer).sideCar.AppendEntries(ctx,
+				&pb.AppendEntriesRequest{
+					LeaderId:     s.id,
+					Term:         s.term,
+					Entries:      []*pb.LogEntry{logEntry},
+					PrevLogTerm:  s.log[index-1].Term,
+					PrevLogIndex: uint64(index - 1),
+				})
+			if err == nil && res.Status == pb.AppendEntriesResponse_SUCCESS {
+				v.(*Peer).logIndex = len(s.log)
+			}
+		}
+		return true
+	})
 }
 
 func (s *RaftServer) sendHeartBeatRequest(ctx context.Context) {
