@@ -87,22 +87,8 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 
 // Publish a message
 func (s *RaftServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
-	// For the initial version, let's block the message if the server is in candidate role.
-	for s.role == pb.Role_Candidate {
-	}
-	log.Printf("publish %+v", req)
-	if s.role == pb.Role_Leader {
-		// Append to log
-		logEntry := &pb.LogEntry{Term: s.term, Topic: req.Topic, Msg: req.Msg}
-		log.Printf("append log: %+v", logEntry)
-		s.log = append(s.log, logEntry)
-		return s.SingleMachineServer.Publish(ctx, req)
-	} else {
-		// Redirect to Leader
-		log.Printf("redirect to leader: %s", s.leaderId)
-		leader, _ := s.peers.Load(s.leaderId)
-		return leader.(*Peer).client.Publish(ctx, req)
-	}
+	// TODO: Implement the method to redirect the message to leader.
+	return s.SingleMachineServer.Publish(ctx, req)
 }
 
 func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
