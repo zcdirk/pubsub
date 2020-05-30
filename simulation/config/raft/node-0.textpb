@@ -1,0 +1,5 @@
+replication_mode: RAFT
+raft_config: {
+  peers: "node-1:7476;node-2:7476;node-3:7476"
+  heartbeat_interval: "10s"
+}

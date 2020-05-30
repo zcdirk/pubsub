@@ -1,0 +1,51 @@
+version: '3.2'
+services:
+  node-0:
+    image: pubsub
+    ports:
+      - "7476:7476"
+    volumes:
+      - type: bind
+        source: ./config/raft
+        target: /config
+    environment:
+      - CONFIG=/config/node-0.textpb
+
+  node-1:
+    depends_on:
+      - node-0
+    image: pubsub
+    ports:
+      - "7477:7476"
+    volumes:
+      - type: bind
+        source: ./config/raft
+        target: /config
+    environment:
+      - CONFIG=/config/node-1.textpb
+
+  node-2:
+    depends_on:
+      - node-1
+    image: pubsub
+    ports:
+      - "7478:7476"
+    volumes:
+      - type: bind
+        source: ./config/raft
+        target: /config
+    environment:
+      - CONFIG=/config/node-2.textpb
+
+  node-3:
+    depends_on:
+      - node-2
+    image: pubsub
+    ports:
+      - "7479:7476"
+    volumes:
+      - type: bind
+        source: ./config/raft
+        target: /config
+    environment:
+      - CONFIG=/config/node-3.textpb
