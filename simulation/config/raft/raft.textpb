@@ -1,6 +1,0 @@
-replication_mode: RAFT
-raft_config: {
-  port: MASTER
-  peers: "addr1:port1;addr2:port2;addr3:port3"
-  heartbeat_timeout: "10s"
-}

@@ -38,8 +38,8 @@ func main() {
 		log.Fatalf("cannot read server config")
 	}
 
-	if prototext.Unmarshal(content, cfg) != nil {
-		log.Fatalf("cannot parse server config")
+	if err := prototext.Unmarshal(content, cfg); err != nil {
+		log.Fatalf("server config has a wrong format: %s", err)
 	}
 
 	proto.Merge(cfg, defaultCfg)

@@ -43,6 +43,15 @@ master-slave-down:
 master-slave-restart:
 	docker-compose -f simulation/master-slave.yaml restart
 
+raft-up:
+	docker-compose -f simulation/raft.yaml up -d
+
+raft-down:
+	docker-compose -f simulation/raft.yaml down
+
+raft-restart:
+	docker-compose -f simulation/raft.yaml restart
+
 clean:
 	rm -rf bin
 	rm -rf mock
