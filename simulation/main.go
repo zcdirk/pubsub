@@ -40,19 +40,12 @@ func launchClient(sub pb.PubSubClient, r chan *clientResult) {
 
 	for {
 		c := &clientResult{}
-
 		for _, w := range word {
-			res, err := stream.Recv()
-			if err != nil {
-				log.Fatalf("cannot read stream: %s", err)
-			}
-
-			if res.Msg.Content != w {
+			if res, _ := stream.Recv(); res.Msg.Content != w {
 				c.incorrect = true
 				break
 			}
 		}
-
 		r <- c
 	}
 }
