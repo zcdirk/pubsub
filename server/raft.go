@@ -94,6 +94,9 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 	// Set ticker
 	svr.ticker = time.NewTicker(svr.getTimeOut())
 	go svr.heartBeat(context.Background())
+
+	// Start election immediately to reduce set up time
+	svr.startElection(context.Background())
 	return svr
 }
 
@@ -183,61 +186,65 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 				s.sendHeartBeatRequest(ctx)
 			case pb.Role_Follower, pb.Role_Candidate:
 				log.Printf("Timeout heartbeat")
-				s.voteFor = ""
-				if s.role == pb.Role_Follower {
-					s.term++
-					s.role = pb.Role_Candidate
-				}
-				// Sleep a random time to avoid conflict for leader election
-				time.Sleep(time.Duration(float32(s.heartbeatInterval) * float32(rand.Intn(10)) / float32(10)))
-
-				if s.voteFor != "" || s.role == pb.Role_Follower {
-					continue
-				}
-				// Request vote
-				voteChannel, voteNum, total := make(chan bool), uint64(1), uint64(0)
-				s.peers.Range(func(k, v interface{}) bool {
-					go func() {
-						res, _ := v.(*Peer).sideCar.RequestVote(ctx, &pb.RequestVoteRequest{
-							Term:         s.term,
-							CandidateId:  s.id,
-							LastLogIndex: uint64(len(s.log) - 1),
-							LastLogTerm:  s.log[len(s.log)-1].Term,
-						})
-						log.Printf("Vote response %+v, received from %s", res, k)
-						if res == nil {
-							voteChannel <- false
-						} else {
-							voteChannel <- res.VoteGranted
-						}
-					}()
-					return true
-				})
-				go func() {
-					for s.role == pb.Role_Candidate && !s.isMajority(voteNum) && total < s.peerNum {
-						select {
-						case v := <-voteChannel:
-							total++
-							if v {
-								voteNum++
-							}
-						default:
-						}
-					}
-					if s.role == pb.Role_Candidate && s.isMajority(voteNum) &&
-						s.voteFor == "" {
-						// Upgrade to leader
-						log.Printf("Upgrade to leader")
-						s.role = pb.Role_Leader
-						s.sendHeartBeatRequest(ctx)
-						s.tickerChange <- s.heartbeatInterval
-					}
-				}()
+				s.startElection(ctx)
 			}
 		case d := <-s.tickerChange:
 			s.resetTicker(d)
 		}
 	}
+}
+
+func (s *RaftServer) startElection(ctx context.Context) {
+	s.voteFor = ""
+	if s.role == pb.Role_Follower {
+		s.term++
+		s.role = pb.Role_Candidate
+	}
+	// Sleep a random time to avoid conflict for leader election
+	time.Sleep(time.Duration(float32(s.heartbeatInterval) * float32(rand.Intn(10)) / float32(10)))
+
+	if s.voteFor != "" || s.role == pb.Role_Follower {
+		return
+	}
+	// Request vote
+	voteChannel, voteNum, total := make(chan bool), uint64(1), uint64(0)
+	s.peers.Range(func(k, v interface{}) bool {
+		go func() {
+			res, _ := v.(*Peer).sideCar.RequestVote(ctx, &pb.RequestVoteRequest{
+				Term:         s.term,
+				CandidateId:  s.id,
+				LastLogIndex: uint64(len(s.log) - 1),
+				LastLogTerm:  s.log[len(s.log)-1].Term,
+			})
+			log.Printf("Vote response %+v, received from %s", res, k)
+			if res == nil {
+				voteChannel <- false
+			} else {
+				voteChannel <- res.VoteGranted
+			}
+		}()
+		return true
+	})
+	go func() {
+		for s.role == pb.Role_Candidate && !s.isMajority(voteNum) && total < s.peerNum {
+			select {
+			case v := <-voteChannel:
+				total++
+				if v {
+					voteNum++
+				}
+			default:
+			}
+		}
+		if s.role == pb.Role_Candidate && s.isMajority(voteNum) &&
+			s.voteFor == "" {
+			// Upgrade to leader
+			log.Printf("Upgrade to leader")
+			s.role = pb.Role_Leader
+			s.sendHeartBeatRequest(ctx)
+			s.tickerChange <- s.heartbeatInterval
+		}
+	}()
 }
 
 func (s *RaftServer) broadcastPublishRequest(ctx context.Context, logEntry *pb.LogEntry) {
