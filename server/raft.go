@@ -183,12 +183,14 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 				s.sendHeartBeatRequest(ctx)
 			case pb.Role_Follower, pb.Role_Candidate:
 				log.Printf("Timeout heartbeat")
-				// Sleep a random time to avoid conflict for leader election
-				time.Sleep(time.Duration(float32(s.heartbeatInterval) * float32(rand.Intn(10)) / float32(10)))
+				s.voteFor = ""
 				if s.role == pb.Role_Follower {
 					s.term++
 					s.role = pb.Role_Candidate
 				}
+				// Sleep a random time to avoid conflict for leader election
+				time.Sleep(time.Duration(float32(s.heartbeatInterval) * float32(rand.Intn(10)) / float32(10)))
+
 				if s.voteFor != "" || s.role == pb.Role_Follower {
 					continue
 				}
