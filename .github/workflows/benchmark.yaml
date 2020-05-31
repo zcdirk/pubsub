@@ -4,47 +4,77 @@ jobs:
   single-machine-benchmark:
     strategy:
       matrix:
-        number-of-client: [200x]
+        number-of-client: [200]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+    - name: golang-env-setup
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14.x
+    - name: install-proto-compiler
+      uses: arduino/setup-protoc@master
     - name: checkout-code
       uses: actions/checkout@v2
+    - name: install-dependencies
+      run: make dependencies
     - name: build-docker-image
       run: make docker
+    - name: build-simulation-binary
+      run: make simulation
     - name: single-machine-benchmark
       run: |
         make single-machine-up
-        go test -bench=BenchmarkSingleMachine -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
+        bin/simulation --upper=${{ matrix.number-of-client }} :7476
     
   master-slave-benchmark:
     strategy:
       matrix:
-        number-of-client: [500x]
+        number-of-client: [500]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+    - name: golang-env-setup
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14.x
+    - name: install-proto-compiler
+      uses: arduino/setup-protoc@master
     - name: checkout-code
       uses: actions/checkout@v2
+    - name: install-dependencies
+      run: make dependencies
     - name: build-docker-image
       run: make docker
+    - name: build-simulation-binary
+      run: make simulation
     - name: master-slave-benchmark
       run: |
         make master-slave-up
-        go test -bench=BenchmarkMasterSlave -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
+        bin/simulation --upper=${{ matrix.number-of-client }} :7476 :7477 :7478 :7479
 
   raft-benchmark:
     strategy:
       matrix:
-        number-of-client: [500x]
+        number-of-client: [500]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+    - name: golang-env-setup
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14.x
+    - name: install-proto-compiler
+      uses: arduino/setup-protoc@master
     - name: checkout-code
       uses: actions/checkout@v2
+    - name: install-dependencies
+      run: make dependencies
     - name: build-docker-image
       run: make docker
+    - name: build-simulation-binary
+      run: make simulation
     - name: raft-benchmark
       run: |
         make raft-up
-        go test -bench=BenchmarkRaft -benchtime=${{ matrix.number-of-client }} -v ./simulation/...
+        bin/simulation --upper=${{ matrix.number-of-client }} :7476 :7477 :7478 :7479

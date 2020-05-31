@@ -7,20 +7,23 @@ dependencies:
 	go get -u github.com/golang/mock/mockgen
 	go get -u github.com/golang/protobuf/protoc-gen-go
 
-pb:
+pb: dependencies
 	protoc proto/*.proto --go_out=plugins=grpc:.
 
-mock:
+mock: pb
 	mockgen -destination mock/pubsub_mock.go github.com/cs244b-2020-spring-pubsub/pubsub/proto PubSub_SubscribeServer,PubSubServer,PubSubClient
 
 test: mock
 	go test -v ./...
 
-server: pb
+server: pb main.go
 	go build -v -o bin/pubsub .
 
-client: pb
+pubsubctl: pb pubsubctl/main.go
 	go build -v -o bin/pubsubctl ./pubsubctl
+
+simulation: pb simulation/main.go
+	go build -v -o bin/simulation ./simulation
 
 docker:
 	docker build -t pubsub .
