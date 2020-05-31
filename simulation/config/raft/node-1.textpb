@@ -1,6 +1,6 @@
 replication_mode: RAFT
 raft_config: {
   address: "node-1"
-  peers: "node-0:7476;node-2:7476;node-3:7476"
+  peers: "node-0:7476;node-2:7476;node-3:7476;node-4:7476"
   heartbeat_interval: "10s"
 }

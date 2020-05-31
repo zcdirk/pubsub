@@ -49,3 +49,17 @@ services:
         target: /config
     environment:
       - CONFIG=/config/node-3.textpb
+
+
+  node-4:
+    depends_on:
+      - node-3
+    image: pubsub
+    ports:
+      - "7480:7476"
+    volumes:
+      - type: bind
+        source: ./config/raft
+        target: /config
+    environment:
+      - CONFIG=/config/node-4.textpb
