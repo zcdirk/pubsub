@@ -89,9 +89,11 @@ func main() {
 		log.Fatalf("cannot parse timeout: %s", err)
 	}
 
-	curr := *step
+	curr := 0
 	r := make(chan *clientResult)
-	for curr <= *upper {
+	for curr < *upper {
+		curr += *step
+
 		for i := 0; i < *step; i++ {
 			go launchClient(sub[i%len(sub)], r)
 		}
@@ -126,8 +128,6 @@ func main() {
 		b.length = end.Sub(start)
 
 		collectCurrentIterationResult(b)
-
-		curr += *step
 
 		time.Sleep(2 * time.Second)
 	}
