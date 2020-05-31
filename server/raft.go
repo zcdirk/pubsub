@@ -25,8 +25,10 @@ type RaftServer struct {
 	leaderID          string
 	heartbeatInterval time.Duration
 	ticker            *time.Ticker
+	timer             *time.Timer
 	log               []*pb.LogEntry
 	voteFor           string
+	tickerChange      chan time.Duration
 }
 
 // Peer structure in Raft implementation.
@@ -86,6 +88,7 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 		term:                0,
 		heartbeatInterval:   heartbeatInterval,
 		log:                 []*pb.LogEntry{{Term: 0}}, // Append an empty log entry for prev log index and term
+		tickerChange:        make(chan time.Duration),
 	}
 
 	// Set ticker
@@ -119,8 +122,10 @@ func (s *RaftServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.P
 // AppendEntries appends log entries or deal with heart beat message.
 func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
 	log.Printf("AppendEntries: %+v", req)
+	s.role = pb.Role_Follower
+	s.leaderID = req.LeaderId
 	// Reset ticker
-	s.resetTicker(s.getTimeOut())
+	s.tickerChange <- s.getTimeOut()
 	if s.voteFor != "" {
 		s.voteFor = ""
 	}
@@ -131,8 +136,6 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 			Info:   "Leader's term need to be updated",
 		}, nil
 	}
-	s.role = pb.Role_Follower
-	s.leaderID = req.LeaderId
 	s.term = req.Term
 	if len(req.Entries) > 0 {
 		if len(s.log) <= int(req.PrevLogIndex) || s.log[req.PrevLogIndex].Term != req.PrevLogTerm {
@@ -156,19 +159,16 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 // RequestVote processes request vote message
 func (s *RaftServer) RequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
 	log.Printf("RequestVote: %+v", req)
-	if s.role != pb.Role_Leader &&
+	voteGrant := s.role != pb.Role_Leader &&
 		s.term <= req.Term &&
-		s.voteFor == "" &&
-		len(s.log) <= int(req.LastLogIndex+1) {
+		(s.voteFor == "" || s.voteFor == req.CandidateId) &&
+		len(s.log) <= int(req.LastLogIndex+1)
+	if voteGrant {
 		s.voteFor = req.CandidateId
-		return &pb.RequestVoteResponse{
-			Term:        s.term,
-			VoteGranted: true,
-		}, nil
 	}
 	return &pb.RequestVoteResponse{
 		Term:        s.term,
-		VoteGranted: false,
+		VoteGranted: voteGrant,
 	}, nil
 }
 
@@ -183,53 +183,58 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 				s.sendHeartBeatRequest(ctx)
 			case pb.Role_Follower, pb.Role_Candidate:
 				log.Printf("Timeout heartbeat")
+				// Sleep a random time to avoid conflict for leader election
+				time.Sleep(time.Duration(float32(s.heartbeatInterval) * float32(rand.Intn(10)) / float32(10)))
 				if s.role == pb.Role_Follower {
 					s.term++
 					s.role = pb.Role_Candidate
-				} else {
-					// Sleep a random time to avoid conflict for leader election
-					time.Sleep(s.heartbeatInterval * time.Duration(rand.Intn(5000)) / time.Duration(1000))
 				}
-				if s.voteFor != "" {
+				if s.voteFor != "" || s.role == pb.Role_Follower {
 					continue
 				}
 				// Request vote
-				voteChannel, voteNum := make(chan bool), uint64(1)
+				voteChannel, voteNum, total := make(chan bool), uint64(1), uint64(0)
 				s.peers.Range(func(k, v interface{}) bool {
 					go func() {
-						log.Printf("node:%s, peer:%+v", k, v)
 						res, _ := v.(*Peer).sideCar.RequestVote(ctx, &pb.RequestVoteRequest{
 							Term:         s.term,
 							CandidateId:  s.id,
 							LastLogIndex: uint64(len(s.log) - 1),
 							LastLogTerm:  s.log[len(s.log)-1].Term,
 						})
-						log.Printf("res:%+v", res)
-						if res != nil && res.VoteGranted {
+						log.Printf("Vote response %+v, received from %s", k)
+						if res == nil {
+							voteChannel <- false
+						} else {
 							voteChannel <- res.VoteGranted
 						}
 					}()
 					return true
 				})
-				timer := time.NewTimer(s.getTimeOut())
-				for s.role == pb.Role_Candidate && !s.isMajority(voteNum) && !expired(timer) {
-					select {
-					case <-voteChannel:
-						voteNum++
-					default:
+				go func() {
+					for s.role == pb.Role_Candidate && !s.isMajority(voteNum) && total < s.peerNum {
+						select {
+						case v := <-voteChannel:
+							total++
+							if v {
+								voteNum++
+							}
+						default:
+						}
 					}
-				}
-				if s.role == pb.Role_Candidate && s.isMajority(voteNum) &&
-					!expired(timer) && s.voteFor == "" {
-					// Upgrade to leader
-					log.Printf("Upgrade to leader")
-					s.role = pb.Role_Leader
-					s.sendHeartBeatRequest(ctx)
-					s.resetTicker(s.heartbeatInterval)
-				}
+					if s.role == pb.Role_Candidate && s.isMajority(voteNum) &&
+						s.voteFor == "" {
+						// Upgrade to leader
+						log.Printf("Upgrade to leader")
+						s.role = pb.Role_Leader
+						s.sendHeartBeatRequest(ctx)
+						s.tickerChange <- s.heartbeatInterval
+					}
+				}()
 			}
+		case d := <-s.tickerChange:
+			s.resetTicker(d)
 		}
-
 	}
 }
 
@@ -255,29 +260,23 @@ func (s *RaftServer) broadcastPublishRequest(ctx context.Context, logEntry *pb.L
 
 func (s *RaftServer) sendHeartBeatRequest(ctx context.Context) {
 	s.peers.Range(func(k, v interface{}) bool {
-		req, index := &pb.AppendEntriesRequest{}, v.(*Peer).logIndex
-		req.LeaderId = s.id
-		req.Term = s.term
-		if index <= len(s.log)-1 {
-			req.Entries = s.log[index:]
-			req.PrevLogTerm = s.log[index-1].Term
-			req.PrevLogIndex = uint64(index - 1)
-		}
-		res, err := v.(*Peer).sideCar.AppendEntries(ctx, req)
-		if err == nil && res.Status == pb.AppendEntriesResponse_SUCCESS {
-			v.(*Peer).logIndex = len(s.log)
-		}
+		go func() {
+			req, index := &pb.AppendEntriesRequest{}, v.(*Peer).logIndex
+			req.LeaderId = s.id
+			req.Term = s.term
+			if index <= len(s.log)-1 {
+				req.Entries = s.log[index:]
+				req.PrevLogTerm = s.log[index-1].Term
+				req.PrevLogIndex = uint64(index - 1)
+			}
+			res, err := v.(*Peer).sideCar.AppendEntries(ctx, req)
+			log.Printf("Respond for heart beat: %+v", res)
+			if err == nil && res.Status == pb.AppendEntriesResponse_SUCCESS {
+				v.(*Peer).logIndex = len(s.log)
+			}
+		}()
 		return true
 	})
-}
-
-func expired(T *time.Timer) bool {
-	select {
-	case <-T.C:
-		return true
-	default:
-		return false
-	}
 }
 
 func (s *RaftServer) isMajority(voteNum uint64) bool {
