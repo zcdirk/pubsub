@@ -6,6 +6,7 @@ RUN apk add build-base
 RUN apk add grpc-dev
 RUN cd /app && \
     make dependencies && \
+    make pb && \
     make server
 
 FROM alpine:latest
