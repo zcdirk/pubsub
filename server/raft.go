@@ -202,7 +202,7 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 							LastLogIndex: uint64(len(s.log) - 1),
 							LastLogTerm:  s.log[len(s.log)-1].Term,
 						})
-						log.Printf("Vote response %+v, received from %s", k)
+						log.Printf("Vote response %+v, received from %s", res, k)
 						if res == nil {
 							voteChannel <- false
 						} else {
