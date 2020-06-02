@@ -24,6 +24,9 @@ var (
 			MasterPort:    7476,
 			MasterTimeout: "10s",
 		},
+		RaftConfig: &pb.ServerConfig_RaftConfig{
+			PeerTimeout: "10m",
+		},
 	}
 )
 
@@ -42,9 +45,9 @@ func main() {
 		log.Fatalf("server config has a wrong format: %s", err)
 	}
 
-	proto.Merge(cfg, defaultCfg)
+	log.Printf("server config:\n%s", content)
 
-	log.Printf("server config: %v", cfg)
+	proto.Merge(cfg, defaultCfg)
 
 	svr, err := server.CreatePubsubServer(cfg,
 		grpc.KeepaliveParams(keepalive.ServerParameters{

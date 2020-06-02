@@ -47,14 +47,14 @@ message ServerConfig {
   MasterSlaveConfig master_slave_config = 3;
 
   message RaftConfig {
-    // Address of itself
-    string address = 1;
-    
-    // Port the raft node used for sidecar service
-    int32 port = 2;
+    // ID of itself
+    string id = 1;
 
-    // Peer address in form of "addr1:port1;addr2:port2"
-    string peers = 3;
+    // Peer address
+    repeated string peers = 2;
+
+    // Timeout of peer connection.
+    string peer_timeout = 3;
 
     // Interval of heartbeat.
     string heartbeat_interval = 4;
