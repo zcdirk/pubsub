@@ -2,11 +2,8 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
-	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -39,26 +36,17 @@ type Peer struct {
 }
 
 // NewRaftServer creates new raft server in raft mode.
-func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
-	// Set the id
-	var id string
-	if cfg.RaftConfig.Address != "" {
-		id = fmt.Sprintf("%s:%d", cfg.RaftConfig.Address, cfg.Port)
-	} else {
-		conn, err := net.Dial("udp", "8.8.8.8:80")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer conn.Close()
-		id = fmt.Sprintf("%s:%d", conn.LocalAddr().(*net.UDPAddr).IP.String(), cfg.Port)
-	}
-	log.Printf("Server id: %s", id)
+func NewRaftServer(cfg *pb.ServerConfig_RaftConfig) *RaftServer {
+	log.Printf("server id: %s", cfg.Id)
 
 	// Parse peers
 	peers := &sync.Map{}
-	timeout, _ := time.ParseDuration("10m")
-	peerStrs := strings.Split(cfg.RaftConfig.Peers, ";")
-	for _, peer := range peerStrs {
+	timeout, err := time.ParseDuration(cfg.PeerTimeout)
+	if err != nil {
+		log.Fatalf("incorrect peer timeout format: %s", cfg.PeerTimeout)
+	}
+
+	for _, peer := range cfg.Peers {
 		log.Printf("connect to peer: %s", peer)
 		conn, err := grpc.Dial(
 			peer,
@@ -67,6 +55,7 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		peers.Store(
 			peer,
 			&Peer{
@@ -77,13 +66,16 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 	}
 
 	// Parse heart beat interval
-	heartbeatInterval, _ := time.ParseDuration(cfg.RaftConfig.HeartbeatInterval)
+	heartbeatInterval, err := time.ParseDuration(cfg.HeartbeatInterval)
+	if err != nil {
+		log.Fatalf("Incorrect heartbeat interval format: %s", cfg.PeerTimeout)
+	}
 
 	svr := &RaftServer{
 		SingleMachineServer: SingleMachineServer{&sync.Map{}},
-		id:                  id,
+		id:                  cfg.Id,
 		peers:               peers,
-		peerNum:             uint64(len(peerStrs)),
+		peerNum:             uint64(len(cfg.Peers)),
 		role:                pb.Role_Candidate,
 		term:                0,
 		heartbeatInterval:   heartbeatInterval,
@@ -103,13 +95,13 @@ func NewRaftServer(cfg *pb.ServerConfig) *RaftServer {
 // Publish a message
 func (s *RaftServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
 	// For the initial version, let's block the message if the server is in candidate role.
-	for s.role == pb.Role_Candidate {
-	}
-	log.Printf("publish %+v", req)
+	for s.role == pb.Role_Candidate {}
+
+	log.Printf("publish %v", req)
 	if s.role == pb.Role_Leader {
 		// Append to log
 		logEntry := &pb.LogEntry{Term: s.term, Topic: req.Topic, Msg: req.Msg}
-		log.Printf("append log: %+v", logEntry)
+		log.Printf("append log: %v", logEntry)
 		s.log = append(s.log, logEntry)
 		// Broadcast the message immediately
 		s.broadcastPublishRequest(ctx, logEntry)
@@ -124,14 +116,12 @@ func (s *RaftServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.P
 
 // AppendEntries appends log entries or deal with heart beat message.
 func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
-	log.Printf("AppendEntries: %+v", req)
+	log.Printf("request from leader to append log entries: %v", req)
 	s.role = pb.Role_Follower
 	s.leaderID = req.LeaderId
 	// Reset ticker
 	s.tickerChange <- s.getTimeOut()
-	if s.voteFor != "" {
-		s.voteFor = ""
-	}
+	s.voteFor = ""
 	if s.term > req.Term {
 		return &pb.AppendEntriesResponse{
 			Term:   s.term,
@@ -139,6 +129,7 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 			Info:   "Leader's term need to be updated",
 		}, nil
 	}
+
 	s.term = req.Term
 	if len(req.Entries) > 0 {
 		if len(s.log) <= int(req.PrevLogIndex) || s.log[req.PrevLogIndex].Term != req.PrevLogTerm {
@@ -148,11 +139,13 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 				Info:   "Prev index and term mismatch",
 			}, nil
 		}
+
 		s.log = append(s.log[:req.PrevLogIndex+1], req.Entries...)
 		for _, e := range req.Entries {
 			s.SingleMachineServer.Publish(ctx, &pb.PublishRequest{Msg: e.Msg, Topic: e.Topic})
 		}
 	}
+
 	return &pb.AppendEntriesResponse{
 		Term:   s.term,
 		Status: pb.AppendEntriesResponse_SUCCESS,
@@ -161,17 +154,19 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 
 // RequestVote processes request vote message
 func (s *RaftServer) RequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
-	log.Printf("RequestVote: %+v", req)
-	voteGrant := s.role != pb.Role_Leader &&
+	log.Printf("requested to vote for candidate: %v", req)
+	grantVote := s.role != pb.Role_Leader &&
 		s.term <= req.Term &&
 		(s.voteFor == "" || s.voteFor == req.CandidateId) &&
 		len(s.log) <= int(req.LastLogIndex+1)
-	if voteGrant {
+	
+	if grantVote {
 		s.voteFor = req.CandidateId
 	}
+
 	return &pb.RequestVoteResponse{
 		Term:        s.term,
-		VoteGranted: voteGrant,
+		VoteGranted: grantVote,
 	}, nil
 }
 
@@ -181,11 +176,11 @@ func (s *RaftServer) heartBeat(ctx context.Context) {
 		case <-s.ticker.C:
 			switch s.role {
 			case pb.Role_Leader:
-				log.Printf("Leader heartbeat")
+				log.Printf("initiate heartbeat as leader")
 				// Send heart beat request to all the followers
 				s.sendHeartBeatRequest(ctx)
 			case pb.Role_Follower, pb.Role_Candidate:
-				log.Printf("Timeout heartbeat")
+				log.Printf("heartbeat timed out")
 				s.startElection(ctx)
 			}
 		case d := <-s.tickerChange:
@@ -200,12 +195,14 @@ func (s *RaftServer) startElection(ctx context.Context) {
 		s.term++
 		s.role = pb.Role_Candidate
 	}
+
 	// Sleep a random time to avoid conflict for leader election
 	time.Sleep(time.Duration(float32(s.heartbeatInterval) * float32(rand.Intn(10)) / float32(10)))
 
 	if s.voteFor != "" || s.role == pb.Role_Follower {
 		return
 	}
+
 	// Request vote
 	voteChannel, voteNum, total := make(chan bool), uint64(1), uint64(0)
 	s.peers.Range(func(k, v interface{}) bool {
@@ -216,7 +213,8 @@ func (s *RaftServer) startElection(ctx context.Context) {
 				LastLogIndex: uint64(len(s.log) - 1),
 				LastLogTerm:  s.log[len(s.log)-1].Term,
 			})
-			log.Printf("Vote response %+v, received from %s", res, k)
+
+			log.Printf("received ballot from %s: %s", k, res)
 			if res == nil {
 				voteChannel <- false
 			} else {
@@ -225,6 +223,7 @@ func (s *RaftServer) startElection(ctx context.Context) {
 		}()
 		return true
 	})
+	
 	go func() {
 		for s.role == pb.Role_Candidate && !s.isMajority(voteNum) && total < s.peerNum {
 			select {
@@ -236,10 +235,11 @@ func (s *RaftServer) startElection(ctx context.Context) {
 			default:
 			}
 		}
+
 		if s.role == pb.Role_Candidate && s.isMajority(voteNum) &&
 			s.voteFor == "" {
 			// Upgrade to leader
-			log.Printf("Upgrade to leader")
+			log.Printf("elected as leader: %s", s.id)
 			s.role = pb.Role_Leader
 			s.sendHeartBeatRequest(ctx)
 			s.tickerChange <- s.heartbeatInterval
@@ -250,6 +250,7 @@ func (s *RaftServer) startElection(ctx context.Context) {
 func (s *RaftServer) broadcastPublishRequest(ctx context.Context, logEntry *pb.LogEntry) {
 	s.peers.Range(func(k, v interface{}) bool {
 		index := v.(*Peer).logIndex
+
 		if index == len(s.log)-1 {
 			res, err := v.(*Peer).sideCar.AppendEntries(ctx,
 				&pb.AppendEntriesRequest{
@@ -259,10 +260,12 @@ func (s *RaftServer) broadcastPublishRequest(ctx context.Context, logEntry *pb.L
 					PrevLogTerm:  s.log[index-1].Term,
 					PrevLogIndex: uint64(index - 1),
 				})
+			
 			if err == nil && res.Status == pb.AppendEntriesResponse_SUCCESS {
 				v.(*Peer).logIndex = len(s.log)
 			}
 		}
+
 		return true
 	})
 }
@@ -278,8 +281,8 @@ func (s *RaftServer) sendHeartBeatRequest(ctx context.Context) {
 				req.PrevLogTerm = s.log[index-1].Term
 				req.PrevLogIndex = uint64(index - 1)
 			}
+
 			res, err := v.(*Peer).sideCar.AppendEntries(ctx, req)
-			log.Printf("Respond for heart beat: %+v", res)
 			if err == nil && res.Status == pb.AppendEntriesResponse_SUCCESS {
 				v.(*Peer).logIndex = len(s.log)
 			}

@@ -1,4 +1,4 @@
-version: '3.2'
+version: '2.4'
 services:
   pubsub:
     image: pubsub
@@ -10,3 +10,5 @@ services:
       target: /config
     environment:
     - CONFIG=/config/server.textpb
+    cpus: 0.50
+    mem_limit: 2G

@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"flag"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,9 +18,11 @@ var (
 	word  = strings.Split("cs244b-2020-spring-pubsub", "")
 	topic = &pb.Topic{Name: "topic"}
 
-	step    = flag.Int("step", 100, "Number of clients added to PubSub each time")
-	upper   = flag.Int("upper", 5000, "Maximum number of clients to be handled")
-	timeout = flag.String("timeout", "2s", "Timeout for each operation")
+	step    = flag.Int("step", 50, "Number of clients added to PubSub each time")
+	lower   = flag.Int("lower", 0, "Lower bound of number of clients to be handled")
+	upper   = flag.Int("upper", 2000, "Upper bound number of clients to be handled")
+	timeout = flag.String("timeout", "10s", "Timeout for each operation")
+	output  = flag.String("output", "result.csv", "Path to export statistics result.")
 )
 
 type clientResult struct {
@@ -29,7 +34,7 @@ type batchResult struct {
 	succeeded int
 	incorrect int
 	timeOut   int
-	length    time.Duration
+	duration    time.Duration
 }
 
 func launchClient(sub pb.PubSubClient, r chan *clientResult) {
@@ -41,7 +46,13 @@ func launchClient(sub pb.PubSubClient, r chan *clientResult) {
 	for {
 		c := &clientResult{}
 		for _, w := range word {
-			if res, _ := stream.Recv(); res.Msg.Content != w {
+			res, err := stream.Recv()
+			if err != nil {
+				return
+			}
+
+			if res.Msg.Content != w {
+				log.Printf("incorrect message: got %s, want %s", res.Msg.Content, w)
 				c.incorrect = true
 				break
 			}
@@ -50,12 +61,27 @@ func launchClient(sub pb.PubSubClient, r chan *clientResult) {
 	}
 }
 
-func collectCurrentIterationResult(r batchResult) {
+func collectCurrentIterationResult(r batchResult, o *csv.Writer) {
 	log.Printf("number of clients: %d", r.size)
 	log.Printf("succeeded: %d", r.succeeded)
 	log.Printf("incorrect: %d", r.incorrect)
 	log.Printf("timed out: %d", r.timeOut)
-	log.Printf("total time used: %s", r.length)
+	log.Printf("total time used: %s", r.duration)
+
+	err := o.Write([]string{
+		strconv.Itoa(r.size),
+		strconv.Itoa(r.succeeded),
+		strconv.Itoa(r.timeOut),
+		r.duration.String(),
+	})
+	if err != nil {
+		log.Fatalf("cannot write to csv: %s", err)
+	}
+
+	o.Flush()
+	if o.Error() != nil {
+		log.Fatalf("cannot write to csv: %s", err)
+	}
 }
 
 func main() {
@@ -89,15 +115,35 @@ func main() {
 		log.Fatalf("cannot parse timeout: %s", err)
 	}
 
-	curr := 0
-	r := make(chan *clientResult)
-	for curr < *upper {
-		curr += *step
+	f, err := os.Create(*output)
+	defer f.Close()
+	if err != nil {
+		log.Fatalf("cannot create output file: %s", err)
+	}
 
-		for i := 0; i < *step; i++ {
+	o := csv.NewWriter(f)
+	o.Write([]string{
+		"size",
+		"succeeded",
+		"timeout",
+		"duration",
+	})
+
+	r := make(chan *clientResult)
+
+	curr := *lower
+	for i := 0; i < curr; i++ {
+		go launchClient(sub[i%len(sub)], r)
+	}
+
+	log.Printf("%d cients have been pre-initiated", curr)
+
+	for curr < *upper {
+		for i := curr; i < curr + *step; i++ {
 			go launchClient(sub[i%len(sub)], r)
 		}
 
+		curr += *step
 		time.Sleep(2 * time.Second)
 
 		for i, x := range word {
@@ -125,10 +171,10 @@ func main() {
 			}
 		}
 		end := time.Now()
-		b.length = end.Sub(start)
+		b.duration = end.Sub(start)
 
-		collectCurrentIterationResult(b)
+		collectCurrentIterationResult(b, o)
 
 		time.Sleep(2 * time.Second)
-	}
+	}	
 }

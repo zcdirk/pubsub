@@ -1,4 +1,4 @@
-version: '3.2'
+version: '2.4'
 services:
   master:
     image: pubsub
@@ -10,6 +10,8 @@ services:
       target: /config
     environment:
     - CONFIG=/config/master.textpb
+    cpus: 0.50
+    mem_limit: 2G
   
   slave-0:
     depends_on: 
@@ -25,6 +27,8 @@ services:
       target: /config
     environment:
     - CONFIG=/config/slave-0.textpb
+    cpus: 0.50
+    mem_limit: 2G
 
   slave-1:
     depends_on:
@@ -38,6 +42,8 @@ services:
       target: /config
     environment:
     - CONFIG=/config/slave-1.textpb
+    cpus: 0.50
+    mem_limit: 2G
   
   slave-2:
     depends_on:
@@ -51,3 +57,5 @@ services:
       target: /config
     environment:
     - CONFIG=/config/slave-2.textpb
+    cpus: 0.50
+    mem_limit: 2G
