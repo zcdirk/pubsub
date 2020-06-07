@@ -51,3 +51,21 @@ services:
     - CONFIG=/config/node-3.textpb
     cpus: 0.50
     mem_limit: 2G
+
+  node-4:
+    depends_on:
+    - node-0
+    - node-1
+    - node-2
+    - node-3
+    image: pubsub
+    ports:
+    - "7480:7476"
+    volumes:
+    - type: bind
+      source: ./config/raft
+      target: /config
+    environment:
+    - CONFIG=/config/node-4.textpb
+    cpus: 0.50
+    mem_limit: 2G

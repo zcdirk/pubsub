@@ -26,6 +26,7 @@ type RaftServer struct {
 	log               []*pb.LogEntry
 	voteFor           string
 	tickerChange      chan time.Duration
+	peerTimeout       time.Duration
 }
 
 // Peer structure in Raft implementation.
@@ -81,6 +82,7 @@ func NewRaftServer(cfg *pb.ServerConfig_RaftConfig) *RaftServer {
 		heartbeatInterval:   heartbeatInterval,
 		log:                 []*pb.LogEntry{{Term: 0}}, // Append an empty log entry for prev log index and term
 		tickerChange:        make(chan time.Duration),
+		peerTimeout:         timeout,
 	}
 
 	// Set ticker
@@ -95,7 +97,8 @@ func NewRaftServer(cfg *pb.ServerConfig_RaftConfig) *RaftServer {
 // Publish a message
 func (s *RaftServer) Publish(ctx context.Context, req *pb.PublishRequest) (*pb.PublishResponse, error) {
 	// For the initial version, let's block the message if the server is in candidate role.
-	for s.role == pb.Role_Candidate {}
+	for s.role == pb.Role_Candidate {
+	}
 
 	log.Printf("publish %v", req)
 	if s.role == pb.Role_Leader {
@@ -155,11 +158,34 @@ func (s *RaftServer) AppendEntries(ctx context.Context, req *pb.AppendEntriesReq
 // RequestVote processes request vote message
 func (s *RaftServer) RequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
 	log.Printf("requested to vote for candidate: %v", req)
+	if _, ok := s.peers.Load(req.CandidateId); !ok {
+		// Detect a new node
+		conn, err := grpc.Dial(
+			req.CandidateId,
+			grpc.WithTimeout(s.peerTimeout),
+			grpc.WithInsecure())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		s.peers.Store(
+			req.CandidateId,
+			&Peer{
+				client:   pb.NewPubSubClient(conn),
+				sideCar:  pb.NewRaftSidecarClient(conn),
+				logIndex: 1,
+			})
+		return &pb.RequestVoteResponse{
+			Term:        s.term,
+			VoteGranted: false,
+		}, nil
+	}
+
 	grantVote := s.role != pb.Role_Leader &&
 		s.term <= req.Term &&
 		(s.voteFor == "" || s.voteFor == req.CandidateId) &&
 		len(s.log) <= int(req.LastLogIndex+1)
-	
+
 	if grantVote {
 		s.voteFor = req.CandidateId
 	}
@@ -223,7 +249,7 @@ func (s *RaftServer) startElection(ctx context.Context) {
 		}()
 		return true
 	})
-	
+
 	go func() {
 		for s.role == pb.Role_Candidate && !s.isMajority(voteNum) && total < s.peerNum {
 			select {
@@ -260,7 +286,7 @@ func (s *RaftServer) broadcastPublishRequest(ctx context.Context, logEntry *pb.L
 					PrevLogTerm:  s.log[index-1].Term,
 					PrevLogIndex: uint64(index - 1),
 				})
-			
+
 			if err == nil && res.Status == pb.AppendEntriesResponse_SUCCESS {
 				v.(*Peer).logIndex = len(s.log)
 			}
